@@ -12,6 +12,8 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
     public GameObject linePrefab; // Prefab de la línea (Image)
     private RectTransform tempLine; // Línea que se dibuja al arrastrar
 
+    [HideInInspector] public GameObject currentManagerLine;
+
     void Awake()
     {
         myNode = GetComponent<EmployeeNode>();
@@ -46,22 +48,33 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnDrop(PointerEventData eventData)
     {
-        // Si soltamos un nodo (subordinado) SOBRE este nodo (jefe)
         UINodeInteraction droppedNodeUI = eventData.pointerDrag.GetComponent<UINodeInteraction>();
 
         if (droppedNodeUI != null && droppedNodeUI != this)
         {
             EmployeeNode subordinateNode = droppedNodeUI.GetComponent<EmployeeNode>();
 
-            // Usamos la lógica del paso anterior para validar
             if (subordinateNode.TryAssignManager(myNode))
             {
-                Debug.Log($"¡Conexión exitosa! {subordinateNode.roleName} ahora reporta a {myNode.roleName}");
-                // (Próximo paso: crear la línea definitiva aquí)
-            }
-            else
-            {
-                Debug.Log("Conexión rechazada por el validador.");
+                // 1. Destruir la línea anterior si el empleado ya tenía otro jefe
+                if (droppedNodeUI.currentManagerLine != null)
+                {
+                    Destroy(droppedNodeUI.currentManagerLine);
+                }
+
+                // 2. Instanciar la línea permanente
+                GameObject permLine = Instantiate(linePrefab, canvas.transform);
+                permLine.transform.SetAsFirstSibling(); // Mandar al fondo
+
+                // 3. Asignar los puntos de inicio y fin
+                UILineConnection lineLogic = permLine.AddComponent<UILineConnection>();
+                lineLogic.startNode = myRect; // Jefe
+                lineLogic.endNode = droppedNodeUI.GetComponent<RectTransform>(); // Subordinado
+
+                // 4. Guardar la referencia en el nodo subordinado
+                droppedNodeUI.currentManagerLine = permLine;
+
+                Debug.Log("Línea permanente creada con éxito.");
             }
         }
     }
