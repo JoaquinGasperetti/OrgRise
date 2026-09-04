@@ -11,6 +11,16 @@ public class EmployeeNode : MonoBehaviour
     public EmployeeNode manager;
     public List<EmployeeNode> directReports = new List<EmployeeNode>();
 
+    public bool isRootNode;
+
+    void Start()
+    {
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.RegistrarNodo(this, isRootNode);
+        }
+    }
+
     /// <summary>
     /// Intenta establecer una conexión de subordinado a jefe.
     /// </summary>

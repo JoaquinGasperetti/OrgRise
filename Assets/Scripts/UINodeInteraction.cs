@@ -75,6 +75,8 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
                 droppedNodeUI.currentManagerLine = permLine;
 
                 Debug.Log("Línea permanente creada con éxito.");
+
+                LevelManager.Instance.EvaluarVictoria();
             }
         }
     }
