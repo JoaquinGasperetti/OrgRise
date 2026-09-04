@@ -507,6 +507,7 @@ GameObject:
   - component: {fileID: 1875649802}
   - component: {fileID: 1875649803}
   - component: {fileID: 1875649804}
+  - component: {fileID: 1875649805}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -669,6 +670,20 @@ MonoBehaviour:
   nodePrefab: {fileID: 3786321845232896473, guid: b12cc05dc8d5e5747877553351b06c9e, type: 3}
   spawnArea: {fileID: 1247667218}
   totalNodos: 10
+--- !u!114 &1875649805
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1875649799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e2f465cbb8350b4487db663b1c86d49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DailyStreakManager
+  currentStreak: 0
+  alreadyPlayedToday: 0
 --- !u!1 &1897581034
 GameObject:
   m_ObjectHideFlags: 0

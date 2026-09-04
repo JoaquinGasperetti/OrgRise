@@ -42,8 +42,13 @@ public class LevelManager : MonoBehaviour
     {
         if (FeedbackManager.Instance != null)
         {
-            // Le pasamos la lista de nodos activos para que los anime
             FeedbackManager.Instance.PlayVictoryFeedback(nodosActivos);
+        }
+
+        // Registramos la victoria para sumar a la racha diaria
+        if (DailyStreakManager.Instance != null)
+        {
+            DailyStreakManager.Instance.RegisterWin();
         }
     }
 }
