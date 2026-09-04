@@ -23,10 +23,17 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        // Instanciar la línea temporal al empezar a arrastrar
+        // RESTRICCIÓN: Si tiene subordinados y no está usando el comodín, bloqueamos el arrastre.
+        if (myNode.directReports.Count > 0 && !WildcardManager.Instance.comodinActivo)
+        {
+            Debug.LogWarning("No puedes mover una rama entera sin un Comodín de Reestructuración.");
+            eventData.pointerDrag = null; // Cancela el evento de arrastre de uGUI
+            return;
+        }
+
         GameObject lineObj = Instantiate(linePrefab, canvas.transform);
         tempLine = lineObj.GetComponent<RectTransform>();
-        tempLine.SetAsFirstSibling(); // Mandar al fondo para que quede detrás de los nodos
+        tempLine.SetAsFirstSibling();
 
         UpdateLineVisuals(eventData.position);
     }
@@ -48,7 +55,7 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnDrop(PointerEventData eventData)
     {
-        UINodeInteraction droppedNodeUI = eventData.pointerDrag.GetComponent<UINodeInteraction>();
+        UINodeInteraction droppedNodeUI = eventData.pointerDrag?.GetComponent<UINodeInteraction>();
 
         if (droppedNodeUI != null && droppedNodeUI != this)
         {
@@ -56,25 +63,22 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
             if (subordinateNode.TryAssignManager(myNode))
             {
-                // 1. Destruir la línea anterior si el empleado ya tenía otro jefe
-                if (droppedNodeUI.currentManagerLine != null)
-                {
-                    Destroy(droppedNodeUI.currentManagerLine);
-                }
+                if (droppedNodeUI.currentManagerLine != null) Destroy(droppedNodeUI.currentManagerLine);
 
-                // 2. Instanciar la línea permanente
                 GameObject permLine = Instantiate(linePrefab, canvas.transform);
-                permLine.transform.SetAsFirstSibling(); // Mandar al fondo
+                permLine.transform.SetAsFirstSibling();
 
-                // 3. Asignar los puntos de inicio y fin
                 UILineConnection lineLogic = permLine.AddComponent<UILineConnection>();
-                lineLogic.startNode = myRect; // Jefe
-                lineLogic.endNode = droppedNodeUI.GetComponent<RectTransform>(); // Subordinado
+                lineLogic.startNode = myRect;
+                lineLogic.endNode = droppedNodeUI.GetComponent<RectTransform>();
 
-                // 4. Guardar la referencia en el nodo subordinado
                 droppedNodeUI.currentManagerLine = permLine;
 
-                Debug.Log("Línea permanente creada con éxito.");
+                // CONSUMIR EL COMODÍN si el nodo movido tenía una rama colgada
+                if (subordinateNode.directReports.Count > 0 && WildcardManager.Instance.comodinActivo)
+                {
+                    WildcardManager.Instance.ConsumirComodin();
+                }
 
                 LevelManager.Instance.EvaluarVictoria();
             }
