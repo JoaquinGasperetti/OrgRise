@@ -91,7 +91,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EmployeeNode
   roleName: 
+  nivel: 0
   maxDirectReports: 0
+  isRootNode: 0
   manager: {fileID: 0}
   directReports: []
 --- !u!114 &8437352066289485690
@@ -107,6 +109,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UINodeInteraction
   linePrefab: {fileID: 3383278499094881904, guid: 7f8b9d0b2474de94ca51068c8ee67468, type: 3}
+  currentManagerLine: {fileID: 0}
 --- !u!1 &7526556497685608484
 GameObject:
   m_ObjectHideFlags: 0
@@ -206,8 +209,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
