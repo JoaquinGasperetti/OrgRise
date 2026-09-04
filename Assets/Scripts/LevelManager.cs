@@ -41,14 +41,13 @@ public class LevelManager : MonoBehaviour
     private void EjecutarFeedbackVictoria()
     {
         if (FeedbackManager.Instance != null)
-        {
             FeedbackManager.Instance.PlayVictoryFeedback(nodosActivos);
-        }
 
-        // Registramos la victoria para sumar a la racha diaria
         if (DailyStreakManager.Instance != null)
-        {
             DailyStreakManager.Instance.RegisterWin();
-        }
+
+        // Refrescar la UI visualmente
+        if (StreakUI.Instance != null)
+            StreakUI.Instance.ActualizarPantalla();
     }
 }
