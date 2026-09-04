@@ -40,6 +40,10 @@ public class LevelManager : MonoBehaviour
 
     private void EjecutarFeedbackVictoria()
     {
-        // Aquí conectaremos los tweens y el sonido "satisfying" de encastre
+        if (FeedbackManager.Instance != null)
+        {
+            // Le pasamos la lista de nodos activos para que los anime
+            FeedbackManager.Instance.PlayVictoryFeedback(nodosActivos);
+        }
     }
 }
