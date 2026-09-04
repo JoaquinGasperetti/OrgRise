@@ -1,88 +1,101 @@
 using UnityEngine;
-using TMPro; // Necesario para modificar el texto de la UI
+using TMPro;
+using UnityEngine.UI;
+using System.Collections.Generic;
 
 public class ProceduralLevelGenerator : MonoBehaviour
 {
-    [Header("Referencias UI")]
     public GameObject nodePrefab;
-    public RectTransform spawnArea; // Un panel invisible que define dónde pueden aparecer
+    public RectTransform spawnArea;
 
-    [Header("Configuración de Generación")]
-    public int seed = 12345; // Cambiando este número, cambia el puzzle entero
     public int totalNodos = 8;
 
-    // Diccionarios o arreglos de nombres automáticos
-    private string[] nombresCEO = { "CEO", "Dir. General", "Presidente" };
-    private string[] nombresDirector = { "Dir. Finanzas", "Dir. Marketing", "Dir. Operaciones", "Dir. RRHH" };
-    private string[] nombresGerente = { "Gte. Ventas", "Gte. Sistemas", "Gte. Logística", "Gte. Soporte" };
-    private string[] nombresEmpleado = { "Analista", "Diseñador", "Desarrollador", "Asistente", "Técnico" };
+    private string[] nombresCEO = { "CEO" };
+    private Departamento[] areasDisponibles = { Departamento.Finanzas, Departamento.Comercial, Departamento.Operaciones, Departamento.Tecnologia };
 
     void Start()
     {
-        // En un juego final, la semilla podría ser la fecha actual:
-        // int semillaDiaria = System.DateTime.Now.DayOfYear + System.DateTime.Now.Year;
-        GenerarNivel(seed, totalNodos);
+        // Generar una semilla aleatoria única por partida
+        int randomSeed = Random.Range(10000, 999999);
+        GenerarNivel(randomSeed, totalNodos);
     }
 
     public void GenerarNivel(int semilla, int cantidad)
     {
-        // 1. Fijar la semilla matemática
         Random.InitState(semilla);
+        if (LevelManager.Instance != null) LevelManager.Instance.nodosActivos.Clear();
 
-        // 2. Limpiar la lista del LevelManager por si estamos reiniciando
-        if (LevelManager.Instance != null)
+        int numDirectores = Mathf.Clamp(cantidad / 4, 1, 4);
+        int numGerentes = Mathf.Clamp(cantidad / 3, 1, 4);
+        int numEmpleados = cantidad - 1 - numDirectores - numGerentes;
+
+        // Seleccionar qué departamentos jugarán en esta partida
+        List<Departamento> areasActivas = new List<Departamento>();
+        for (int i = 0; i < numDirectores; i++) areasActivas.Add(areasDisponibles[i]);
+
+        // Fila 0: CEO
+        CrearNodoUI(NivelJerarquico.CEO, Departamento.General, "CEO", true, Random.Range(2, 4), 0, 1);
+
+        // Fila 1: Directores (Uno por cada área activa)
+        for (int i = 0; i < numDirectores; i++)
+            CrearNodoUI(NivelJerarquico.Director, areasActivas[i], $"Dir. {areasActivas[i]}", false, Random.Range(2, 4), i, numDirectores);
+
+        // Fila 2: Gerentes (Distribuidos equitativamente en las áreas activas)
+        for (int i = 0; i < numGerentes; i++)
         {
-            LevelManager.Instance.nodosActivos.Clear();
+            Departamento areaAsignada = areasActivas[i % areasActivas.Count];
+            CrearNodoUI(NivelJerarquico.Gerente, areaAsignada, $"Gte. {areaAsignada}", false, Random.Range(2, 4), i, numGerentes);
         }
 
-        // 3. Calcular la distribución piramidal de jerarquías
-        int numDirectores = Mathf.Clamp(cantidad / 4, 1, 3);
-        int numGerentes = Mathf.Clamp(cantidad / 3, 1, 4);
-        int numEmpleados = cantidad - 1 - numDirectores - numGerentes; // El -1 es por el CEO
-
-        // 4. Instanciar nodos en orden jerárquico
-        // CEO (Raíz)
-        CrearNodoUI(NivelJerarquico.CEO, nombresCEO[Random.Range(0, nombresCEO.Length)], true, Random.Range(2, 4));
-
-        // Directores
-        for (int i = 0; i < numDirectores; i++)
-            CrearNodoUI(NivelJerarquico.Director, nombresDirector[Random.Range(0, nombresDirector.Length)], false, Random.Range(2, 4));
-
-        // Gerentes
-        for (int i = 0; i < numGerentes; i++)
-            CrearNodoUI(NivelJerarquico.Gerente, nombresGerente[Random.Range(0, nombresGerente.Length)], false, Random.Range(2, 4));
-
-        // Empleados Base (No pueden tener subordinados, su límite es 0)
+        // Fila 3: Empleados Base
         for (int i = 0; i < numEmpleados; i++)
-            CrearNodoUI(NivelJerarquico.EmpleadoBase, nombresEmpleado[Random.Range(0, nombresEmpleado.Length)], false, 0);
+        {
+            Departamento areaAsignada = areasActivas[i % areasActivas.Count];
+            CrearNodoUI(NivelJerarquico.EmpleadoBase, areaAsignada, $"Analista {areaAsignada}", false, 0, i, numEmpleados);
+        }
     }
 
-    private void CrearNodoUI(NivelJerarquico nivel, string nombre, bool esRaiz, int maxReportes)
+    private void CrearNodoUI(NivelJerarquico nivel, Departamento depto, string nombre, bool esRaiz, int maxReportes, int indexEnFila, int totalEnFila)
     {
-        // Instanciar el prefab en el área designada
         GameObject nuevoNodoObj = Instantiate(nodePrefab, spawnArea);
-
-        // Posicionar aleatoriamente dentro del panel (dejando un margen)
         RectTransform rect = nuevoNodoObj.GetComponent<RectTransform>();
-        float randomX = Random.Range(-spawnArea.rect.width / 2.5f, spawnArea.rect.width / 2.5f);
-        float randomY = Random.Range(-spawnArea.rect.height / 2.5f, spawnArea.rect.height / 2.5f);
-        rect.anchoredPosition = new Vector2(randomX, randomY);
 
-        // Configurar los datos lógicos en el script
+        float rowHeight = spawnArea.rect.height / 4;
+        float yPos = ((spawnArea.rect.height / 2f) - (rowHeight / 2f)) - ((int)nivel * rowHeight);
+        float colWidth = spawnArea.rect.width / (totalEnFila + 1);
+        float xPos = -(spawnArea.rect.width / 2f) + (colWidth * (indexEnFila + 1));
+
+        rect.anchoredPosition = new Vector2(xPos, yPos);
+
         EmployeeNode dataNodo = nuevoNodoObj.GetComponent<EmployeeNode>();
         dataNodo.roleName = nombre;
         dataNodo.nivel = nivel;
+        dataNodo.departamento = depto;
         dataNodo.isRootNode = esRaiz;
         dataNodo.maxDirectReports = maxReportes;
 
-        // Actualizar el componente visual (Texto) para que el jugador sepa qué está conectando
+        // Asignar color según el departamento
+        Image fondo = nuevoNodoObj.GetComponent<Image>();
+        fondo.color = ObtenerColorArea(depto);
+
         TextMeshProUGUI textoUI = nuevoNodoObj.GetComponentInChildren<TextMeshProUGUI>();
         if (textoUI != null)
         {
-            if (maxReportes > 0)
-                textoUI.text = $"<b>{nombre}</b>\n<size=70%>Max Reportes: {maxReportes}</size>";
-            else
-                textoUI.text = $"<b>{nombre}</b>"; // Los empleados base no muestran límite
+            string textoLimite = maxReportes > 0 ? $"\n<size=70%>Max: {maxReportes}</size>" : "";
+            textoUI.text = $"<color=black><b>{nombre}</b>{textoLimite}</color>";
+        }
+    }
+
+    private Color ObtenerColorArea(Departamento depto)
+    {
+        switch (depto)
+        {
+            case Departamento.General: return Color.white;
+            case Departamento.Finanzas: return new Color(0.6f, 0.9f, 0.6f); // Verde pastel
+            case Departamento.Comercial: return new Color(0.6f, 0.8f, 1f);   // Azul pastel
+            case Departamento.Operaciones: return new Color(1f, 0.8f, 0.6f); // Naranja pastel
+            case Departamento.Tecnologia: return new Color(0.9f, 0.7f, 1f);  // Violeta pastel
+            default: return Color.white;
         }
     }
 }
