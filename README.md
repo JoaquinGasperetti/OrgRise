@@ -27,9 +27,9 @@ El diseño del juego traduce directamente la teoría a mecánicas jugables:
 * **Centralización vs. Descentralización** = Puzzles que obligan a distribuir la autoridad en lugar de concentrarla en un solo nodo.
 
 ## 🚀 Roadmap / Próximos Pasos (To-Do)
-- [ ] Desarrollar el prototipo jugable de las mecánicas base (conexión, tramo de control y validación).
+- [✔] Desarrollar el prototipo jugable de las mecánicas base (conexión, tramo de control y validación).
 - [ ] Realizar playtesting interno y ajustar la curva de dificultad.
-- [ ] Implementar el sistema de racha y el generador de puzzle diario.
+- [✔] Implementar el sistema de racha y el generador de puzzle diario.
 - [ ] Integrar monetización: AdMob (video recompensado) y compras in-app (IAP) cosméticas.
 - [ ] Pulir el arte final de los 4 skins temáticos (Startup, Corporación, Gobierno, ONG).
 - [ ] Grabar clips de 15-20 segundos del gameplay final para la campaña en redes.
