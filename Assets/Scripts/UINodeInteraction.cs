@@ -83,6 +83,13 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
                 LevelManager.Instance.EvaluarVictoria();
             }
         }
+
+        // Dentro de OnDrop, después de: droppedNodeUI.currentManagerLine = permLine;
+
+        if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.NotificarConexionExitosa();
+        }
     }
 
     private void UpdateLineVisuals(Vector2 targetPosition)
