@@ -14,7 +14,7 @@ public class ProceduralLevelGenerator : MonoBehaviour
     [Header("Configuración")]
     public int totalNodos = 10;
 
-    private string[] nombresCEO = { "CEO", "Dirección General", "Presidencia" };
+    private string[] nombresCEO = { "CEO", "Dir. General", "Presidencia" };
     private Departamento[] areasDisponibles = { Departamento.Finanzas, Departamento.Comercial, Departamento.Operaciones, Departamento.Tecnologia };
 
     private string[] prefijosDirector = { "Dir.", "VP", "Head of" };
@@ -28,7 +28,6 @@ public class ProceduralLevelGenerator : MonoBehaviour
 
     void Start()
     {
-        // Si LevelManager está presente, coordina la carga de la campaña académica y puzzle diario
         if (LevelManager.Instance != null)
         {
             LevelManager.Instance.IniciarJuego();
@@ -62,10 +61,6 @@ public class ProceduralLevelGenerator : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Método original mejorado: garantiza que la suma de capacidades (Tramo de Control) de cada departamento
-    /// y nivel jerárquico sea siempre suficiente para resolver el organigrama al 100%.
-    /// </summary>
     public void GenerarNivel(int semilla, int cantidad)
     {
         GenerarNivelAcademico(
@@ -76,10 +71,6 @@ public class ProceduralLevelGenerator : MonoBehaviour
         );
     }
 
-    /// <summary>
-    /// Genera un organigrama resoluble adaptando las reglas según el Criterio de Departamentalización
-    /// y el grado de Centralización vs. Descentralización.
-    /// </summary>
     public void GenerarNivelAcademico(
         int semilla,
         int cantidad,
@@ -87,28 +78,27 @@ public class ProceduralLevelGenerator : MonoBehaviour
         ModoAutoridad autoridad)
     {
         LimpiarTablero();
+
+        // Forzamos actualización de layout del Canvas antes de calcular posiciones en móvil vertical
+        Canvas.ForceUpdateCanvases();
+
         Random.InitState(semilla);
+        cantidad = Mathf.Clamp(cantidad, 4, 12);
 
-        cantidad = Mathf.Clamp(cantidad, 4, 14);
-
-        // Si la estructura es Centralizada (ej. Startup temprana o estructura chata),
-        // la cúpula concentra el control directo con menos niveles intermedios.
         if (autoridad == ModoAutoridad.Centralizada)
         {
             GenerarEstructuraCentralizada(cantidad, criterio);
             return;
         }
 
-        // Determinamos cantidad de Directores, Gerentes y Empleados Base asegurando simetría por departamento
         int numDirectores = Mathf.Clamp(cantidad / 4, 2, 3);
         int restantes = cantidad - 1 - numDirectores;
 
-        // En estructura Descentralizada hay más mandos medios delegando autoridad y tramos de control estrechos
         int numGerentes = autoridad == ModoAutoridad.Descentralizada
-            ? Mathf.Clamp(Mathf.CeilToInt(restantes * 0.45f), numDirectores, 5)
+            ? Mathf.Clamp(Mathf.CeilToInt(restantes * 0.45f), numDirectores, 4)
             : Mathf.Clamp(restantes / 2, numDirectores, 4);
 
-        int numEmpleados = Mathf.Max(numDirectores, cantidad - 1 - numDirectores - numGerentes);
+        int numEmpleados = Mathf.Clamp(cantidad - 1 - numDirectores - numGerentes, numDirectores, 5);
 
         List<Departamento> areasActivas = new List<Departamento>();
         for (int i = 0; i < numDirectores; i++)
@@ -116,21 +106,18 @@ public class ProceduralLevelGenerator : MonoBehaviour
             areasActivas.Add(areasDisponibles[i % areasDisponibles.Length]);
         }
 
-        // Asignamos departamentos a Gerentes (al menos 1 por cada Director activo)
         List<Departamento> deptosGerentes = new List<Departamento>();
         for (int i = 0; i < numGerentes; i++)
         {
             deptosGerentes.Add(areasActivas[i % areasActivas.Count]);
         }
 
-        // Asignamos departamentos a Empleados Base (distribuidos entre las áreas activas)
         List<Departamento> deptosEmpleados = new List<Departamento>();
         for (int i = 0; i < numEmpleados; i++)
         {
             deptosEmpleados.Add(areasActivas[i % areasActivas.Count]);
         }
 
-        // Contamos cuántos Gerentes y Empleados hay en cada Departamento para garantizar solubilidad matemática
         Dictionary<Departamento, int> gerentesPorArea = new Dictionary<Departamento, int>();
         Dictionary<Departamento, int> empleadosPorArea = new Dictionary<Departamento, int>();
         foreach (var area in areasActivas)
@@ -143,21 +130,19 @@ public class ProceduralLevelGenerator : MonoBehaviour
 
         HashSet<string> nombresUsados = new HashSet<string>();
 
-        // --- FILA 0: CEO (Nivel Estratégico) ---
-        // El CEO necesita al menos tantos reportes directos como Directores existen
+        // FILA 0: CEO
         int extraCEO = autoridad == ModoAutoridad.Descentralizada ? 0 : 1;
         int cupoCEO = numDirectores + extraCEO;
         string nombreCEO = ObtenerNombreUnico(new List<string>(nombresCEO), "", nombresUsados);
         CrearNodoUI(NivelJerarquico.CEO, Departamento.General, nombreCEO, true, cupoCEO, 0, 1, 4);
 
-        // --- FILA 1: Directores (Nivel Ejecutivo) ---
+        // FILA 1: Directores
         for (int i = 0; i < numDirectores; i++)
         {
             Departamento area = areasActivas[i];
             string etiquetaArea = ObtenerEtiquetaCriterio(area, criterio);
             string nombreDir = ObtenerNombreUnico(new List<string>(prefijosDirector), etiquetaArea, nombresUsados);
 
-            // Cada Director debe poder recibir a todos los Gerentes de su área
             int minNecesarioDir = Mathf.Max(1, gerentesPorArea[area]);
             int holguraDir = autoridad == ModoAutoridad.Descentralizada ? 0 : 1;
             int cupoDirector = minNecesarioDir + holguraDir;
@@ -165,18 +150,13 @@ public class ProceduralLevelGenerator : MonoBehaviour
             CrearNodoUI(NivelJerarquico.Director, area, nombreDir, false, cupoDirector, i, numDirectores, 4);
         }
 
-        // --- FILA 2: Gerentes (Nivel Táctico) ---
-        // Calculamos cuántos empleados debe absorber cada gerente de su área
-        Dictionary<Departamento, int> gerentesCreadosPorArea = new Dictionary<Departamento, int>();
-        foreach (var area in areasActivas) gerentesCreadosPorArea[area] = 0;
-
+        // FILA 2: Gerentes
         for (int i = 0; i < numGerentes; i++)
         {
             Departamento area = deptosGerentes[i];
             int totalGerentesArea = gerentesPorArea[area];
             int totalEmpleadosArea = empleadosPorArea[area];
 
-            // Reparto garantizado: techo(empleadosDelArea / gerentesDelArea)
             int cupoMinimoGerente = Mathf.Max(1, Mathf.CeilToInt((float)totalEmpleadosArea / totalGerentesArea));
             int holguraGte = (autoridad == ModoAutoridad.Descentralizada) ? 0 : (i % 2 == 0 ? 1 : 0);
             int cupoGerente = cupoMinimoGerente + holguraGte;
@@ -185,10 +165,9 @@ public class ProceduralLevelGenerator : MonoBehaviour
             string nombreGte = ObtenerNombreUnico(new List<string>(prefijosGerente), etiquetaArea, nombresUsados);
 
             CrearNodoUI(NivelJerarquico.Gerente, area, nombreGte, false, cupoGerente, i, numGerentes, 4);
-            gerentesCreadosPorArea[area]++;
         }
 
-        // --- FILA 3: Empleados Base (Nivel Operativo) ---
+        // FILA 3: Empleados Base
         for (int i = 0; i < numEmpleados; i++)
         {
             Departamento area = deptosEmpleados[i];
@@ -200,10 +179,8 @@ public class ProceduralLevelGenerator : MonoBehaviour
 
     private void GenerarEstructuraCentralizada(int cantidad, CriterioDepartamentalizacion criterio)
     {
-        // En una estructura centralizada, la autoridad se concentra arriba:
-        // 1 CEO con tramo de control amplio + Gerentes/Líderes que reportan directo al CEO + Operativos
         int numMandos = Mathf.Clamp(cantidad / 3, 2, 3);
-        int numEmpleados = Mathf.Max(2, cantidad - 1 - numMandos);
+        int numEmpleados = Mathf.Clamp(cantidad - 1 - numMandos, 2, 5);
 
         List<Departamento> areasActivas = new List<Departamento>();
         for (int i = 0; i < numMandos; i++)
@@ -213,11 +190,9 @@ public class ProceduralLevelGenerator : MonoBehaviour
 
         HashSet<string> nombresUsados = new HashSet<string>();
 
-        // CEO con tramo de control amplio (puede recibir a todos los mandos e incluso supervisión directa)
         string nombreCEO = ObtenerNombreUnico(new List<string>(nombresCEO), "Central", nombresUsados);
         CrearNodoUI(NivelJerarquico.CEO, Departamento.General, nombreCEO, true, numMandos + 1, 0, 1, 3);
 
-        // Fila intermedia: Directores de área con tramo amplio
         for (int i = 0; i < numMandos; i++)
         {
             Departamento area = areasActivas[i];
@@ -227,7 +202,6 @@ public class ProceduralLevelGenerator : MonoBehaviour
             CrearNodoUI(NivelJerarquico.Director, area, nombreMando, false, empleadosDeEstaArea, i, numMandos, 3);
         }
 
-        // Fila operativa (en 3 filas visuales para que se note la estructura chata / horizontal)
         for (int i = 0; i < numEmpleados; i++)
         {
             Departamento area = areasActivas[i % areasActivas.Count];
@@ -266,10 +240,10 @@ public class ProceduralLevelGenerator : MonoBehaviour
             case CriterioDepartamentalizacion.Geografica:
                 switch (depto)
                 {
-                    case Departamento.Finanzas: return "Región Norte";
-                    case Departamento.Comercial: return "Región Centro";
-                    case Departamento.Operaciones: return "Región Sur";
-                    case Departamento.Tecnologia: return "Región Exterior";
+                    case Departamento.Finanzas: return "Reg. Norte";
+                    case Departamento.Comercial: return "Reg. Centro";
+                    case Departamento.Operaciones: return "Reg. Sur";
+                    case Departamento.Tecnologia: return "Reg. Exterior";
                 }
                 break;
 
@@ -327,35 +301,58 @@ public class ProceduralLevelGenerator : MonoBehaviour
     {
         GameObject nuevoNodoObj = Instantiate(nodePrefab, spawnArea);
         RectTransform rect = nuevoNodoObj.GetComponent<RectTransform>();
+        rect.localScale = Vector3.one;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
 
-        float areaWidth = spawnArea.rect.width > 100f ? spawnArea.rect.width : 980f;
-        float areaHeight = spawnArea.rect.height > 100f ? spawnArea.rect.height : 1250f;
+        float areaWidth = spawnArea.rect.width > 100f ? spawnArea.rect.width : 940f;
+        float areaHeight = spawnArea.rect.height > 100f ? spawnArea.rect.height : 1200f;
 
+        // Calculamos el ancho y alto seguros de cada tarjeta según cuántos nodos comparten la fila en vertical
+        float espacioPorColumna = areaWidth / Mathf.Max(1, totalEnFila);
+        float anchoTarjeta = Mathf.Clamp(espacioPorColumna * 0.88f, 130f, 220f);
+        float altoTarjeta = Mathf.Clamp((areaHeight / Mathf.Max(2, totalFilas)) * 0.44f, 88f, 115f);
+        rect.sizeDelta = new Vector2(anchoTarjeta, altoTarjeta);
+
+        // Distribución horizontal equitativa dentro de los márgenes de SpawnArea (nunca se desborda a los lados)
+        float xPos = 0f;
+        if (totalEnFila == 1)
+        {
+            xPos = 0f;
+        }
+        else
+        {
+            float margenLateral = (anchoTarjeta * 0.5f) + 12f;
+            float minX = -(areaWidth * 0.5f) + margenLateral;
+            float maxX = (areaWidth * 0.5f) - margenLateral;
+            float t = (float)indexEnFila / (totalEnFila - 1);
+            xPos = Mathf.Lerp(minX, maxX, t);
+        }
+
+        // Distribución vertical equitativa dentro de los márgenes superior e inferior de SpawnArea
         int filaIndice = filaVisualOverride >= 0 ? filaVisualOverride : (int)nivel;
-        float rowHeight = areaHeight / Mathf.Max(2, totalFilas);
-        float yPos = ((areaHeight / 2f) - (rowHeight / 2f)) - (filaIndice * rowHeight);
-
-        float colWidth = areaWidth / (totalEnFila + 1);
-        float xPos = -(areaWidth / 2f) + (colWidth * (indexEnFila + 1));
+        float margenVertical = (altoTarjeta * 0.5f) + 18f;
+        float topY = (areaHeight * 0.5f) - margenVertical;
+        float bottomY = -(areaHeight * 0.5f) + margenVertical;
+        float ty = totalFilas > 1 ? (float)filaIndice / (totalFilas - 1) : 0.5f;
+        float yPos = Mathf.Lerp(topY, bottomY, ty);
 
         rect.anchoredPosition = new Vector2(xPos, yPos);
-
-        // Ajustamos la escala horizontal automáticamente si hay 4 o más nodos en la misma fila para que no se solapen
-        float anchoDisponiblePorNodo = (areaWidth / Mathf.Max(1, totalEnFila)) * 0.88f;
-        float anchoTarjeta = Mathf.Clamp(anchoDisponiblePorNodo, 165f, 230f);
-        rect.sizeDelta = new Vector2(anchoTarjeta, 108f);
 
         TextMeshProUGUI textoUI = nuevoNodoObj.GetComponentInChildren<TextMeshProUGUI>();
         if (textoUI != null)
         {
             RectTransform txtRect = textoUI.GetComponent<RectTransform>();
+            txtRect.localScale = Vector3.one;
             txtRect.anchorMin = Vector2.zero;
             txtRect.anchorMax = Vector2.one;
             txtRect.offsetMin = new Vector2(6f, 4f);
             txtRect.offsetMax = new Vector2(-6f, -4f);
+            textoUI.margin = Vector4.zero;
             textoUI.enableAutoSizing = true;
-            textoUI.fontSizeMin = 15f;
-            textoUI.fontSizeMax = 25f;
+            textoUI.fontSizeMin = 12f;
+            textoUI.fontSizeMax = 24f;
         }
 
         EmployeeNode dataNodo = nuevoNodoObj.GetComponent<EmployeeNode>();
@@ -375,11 +372,11 @@ public class ProceduralLevelGenerator : MonoBehaviour
     {
         switch (depto)
         {
-            case Departamento.General: return new Color(0.95f, 0.96f, 0.98f);     // Blanco Perla (Cúpula)
-            case Departamento.Finanzas: return new Color(0.65f, 0.92f, 0.68f);    // Verde Finanzas / Div. 1
-            case Departamento.Comercial: return new Color(0.64f, 0.82f, 1.0f);    // Azul Comercial / Div. 2
-            case Departamento.Operaciones: return new Color(1.0f, 0.82f, 0.60f);  // Naranja Operaciones / Div. 3
-            case Departamento.Tecnologia: return new Color(0.88f, 0.72f, 1.0f);   // Violeta Tecnología / Div. 4
+            case Departamento.General: return new Color(0.95f, 0.96f, 0.98f);
+            case Departamento.Finanzas: return new Color(0.65f, 0.92f, 0.68f);
+            case Departamento.Comercial: return new Color(0.64f, 0.82f, 1.0f);
+            case Departamento.Operaciones: return new Color(1.0f, 0.82f, 0.60f);
+            case Departamento.Tecnologia: return new Color(0.88f, 0.72f, 1.0f);
             default: return Color.white;
         }
     }

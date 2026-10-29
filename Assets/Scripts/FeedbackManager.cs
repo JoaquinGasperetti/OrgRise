@@ -10,11 +10,10 @@ public class FeedbackManager : MonoBehaviour
     public static FeedbackManager Instance;
 
     [Header("Audio")]
-    public AudioClip snapSound;    // Sonido individual al conectar
-    public AudioClip victorySound; // Sonido final al completar
+    public AudioClip snapSound;
+    public AudioClip victorySound;
     private AudioSource audioSource;
 
-    // Banner dinámico de estado académico
     private GameObject toastObject;
     private TextMeshProUGUI toastText;
     private Image toastBg;
@@ -43,7 +42,7 @@ public class FeedbackManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(mensaje))
         {
-            MostrarMensajeEstado(mensaje, new Color(0.12f, 0.45f, 0.22f, 0.92f), 2.2f);
+            MostrarMensajeEstado(mensaje, new Color(0.12f, 0.45f, 0.22f, 0.94f), 2.2f);
         }
     }
 
@@ -62,7 +61,7 @@ public class FeedbackManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(motivo))
         {
-            MostrarMensajeEstado($"⚠️ {motivo}", new Color(0.68f, 0.14f, 0.14f, 0.95f), 3.8f);
+            MostrarMensajeEstado($"⚠️ {motivo}", new Color(0.68f, 0.14f, 0.14f, 0.96f), 3.8f);
         }
     }
 
@@ -95,30 +94,34 @@ public class FeedbackManager : MonoBehaviour
         toastObject = new GameObject("AcademicToastBanner", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         toastObject.transform.SetParent(mainCanvas.transform, false);
 
+        // Anclado en la franja inferior (1% a 7.5% de altura) debajo del botón Comodín sin salirse del teléfono
         RectTransform rt = toastObject.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.05f, 0f);
-        rt.anchorMax = new Vector2(0.95f, 0f);
-        rt.pivot = new Vector2(0.5f, 0f);
-        rt.anchoredPosition = new Vector2(0f, 35f);
-        rt.sizeDelta = new Vector2(0f, 115f);
+        rt.localScale = Vector3.one;
+        rt.anchorMin = new Vector2(0.03f, 0.01f);
+        rt.anchorMax = new Vector2(0.97f, 0.078f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
 
         toastBg = toastObject.GetComponent<Image>();
-        toastBg.color = new Color(0.15f, 0.2f, 0.28f, 0.92f);
+        toastBg.color = new Color(0.15f, 0.2f, 0.28f, 0.94f);
         toastBg.raycastTarget = false;
 
         GameObject txtObj = new GameObject("ToastText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         txtObj.transform.SetParent(toastObject.transform, false);
 
         RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+        txtRt.localScale = Vector3.one;
         txtRt.anchorMin = Vector2.zero;
         txtRt.anchorMax = Vector2.one;
-        txtRt.offsetMin = new Vector2(24f, 10f);
-        txtRt.offsetMax = new Vector2(-24f, -10f);
+        txtRt.offsetMin = new Vector2(16f, 6f);
+        txtRt.offsetMax = new Vector2(-16f, -6f);
 
         toastText = txtObj.GetComponent<TextMeshProUGUI>();
-        toastText.fontSize = 26f;
         toastText.alignment = TextAlignmentOptions.Center;
         toastText.color = Color.white;
+        toastText.enableAutoSizing = true;
+        toastText.fontSizeMin = 13f;
+        toastText.fontSizeMax = 24f;
         toastText.raycastTarget = false;
 
         toastObject.SetActive(false);
@@ -150,7 +153,7 @@ public class FeedbackManager : MonoBehaviour
         if (target == null) yield break;
 
         Vector3 originalScale = Vector3.one;
-        Vector3 punchScale = originalScale * 1.18f;
+        Vector3 punchScale = originalScale * 1.15f;
         float duration = 0.18f;
         float elapsed = 0f;
 
@@ -194,7 +197,7 @@ public class FeedbackManager : MonoBehaviour
         while (elapsed < duration)
         {
             if (rt == null) yield break;
-            float offsetX = Mathf.Sin(elapsed * 55f) * 12f;
+            float offsetX = Mathf.Sin(elapsed * 55f) * 10f;
             rt.anchoredPosition = originalPos + new Vector2(offsetX, 0f);
             elapsed += Time.deltaTime;
             yield return null;

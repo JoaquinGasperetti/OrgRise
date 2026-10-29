@@ -19,7 +19,7 @@ public class LevelManager : MonoBehaviour
     public bool ExigirCadenaEstricta = true;
     private bool nivelYaCompletado = false;
 
-    // UI de Cabecera Académica (creada automáticamente en Canvas)
+    // UI de Cabecera Académica
     private TextMeshProUGUI headerTitleText;
     private TextMeshProUGUI headerSubText;
 
@@ -39,7 +39,7 @@ public class LevelManager : MonoBehaviour
         new ConfiguracionNivelAcademico
         {
             titulo = "Nivel 1: Cadena de Mando y Tramo de Control",
-            subtitulo = "Departamentalización Funcional | Conectá cada rol respetando área y límite de reportes",
+            subtitulo = "Departamentalización Funcional | Conectá cada rol respetando su área y cupo",
             resumenVictoria = "<b>Concepto validado: Cadena de Mando y Tramo de Control</b>\n\nEstableciste la línea de autoridad formal desde el Nivel Operativo hasta el Nivel Estratégico (CEO) sin superar la capacidad de supervisión directa de ningún mando.",
             cantidadNodos = 8,
             criterio = CriterioDepartamentalizacion.Funcional,
@@ -49,8 +49,8 @@ public class LevelManager : MonoBehaviour
         new ConfiguracionNivelAcademico
         {
             titulo = "Nivel 2: Departamentalización por Producto",
-            subtitulo = "Agrupamiento por División (PyMEs, Consumo, Industria) | Unidad de Mando por línea de negocio",
-            resumenVictoria = "<b>Concepto validado: Departamentalización por Producto</b>\n\nAgrupaste los roles según la línea de producto/servicio que atienden, facilitando la coordinación autónoma de cada unidad de negocio bajo un responsable divisional.",
+            subtitulo = "Agrupamiento por División (PyMEs, Consumo, Industria) | Unidad de Mando",
+            resumenVictoria = "<b>Concepto validado: Departamentalización por Producto</b>\n\nAgrupaste los roles según la línea de producto/servicio que atienden, facilitando la coordinación autónoma de cada unidad de negocio.",
             cantidadNodos = 9,
             criterio = CriterioDepartamentalizacion.PorProducto,
             autoridad = ModoAutoridad.Equilibrada,
@@ -59,8 +59,8 @@ public class LevelManager : MonoBehaviour
         new ConfiguracionNivelAcademico
         {
             titulo = "Nivel 3: Departamentalización Geográfica",
-            subtitulo = "Agrupamiento Territorial (Norte, Centro, Sur) | Gestión regional descentralizada",
-            resumenVictoria = "<b>Concepto validado: Departamentalización Geográfica</b>\n\nOrganizaste las operaciones por zonas territoriales para responder con agilidad a las necesidades de cada mercado regional.",
+            subtitulo = "Agrupamiento Territorial (Norte, Centro, Sur) | Gestión regional",
+            resumenVictoria = "<b>Concepto validado: Departamentalización Geográfica</b>\n\nOrganizaste las operaciones por zonas territoriales para responder con agilidad a las demandas de cada región.",
             cantidadNodos = 10,
             criterio = CriterioDepartamentalizacion.Geografica,
             autoridad = ModoAutoridad.Equilibrada,
@@ -68,9 +68,9 @@ public class LevelManager : MonoBehaviour
         },
         new ConfiguracionNivelAcademico
         {
-            titulo = "Nivel 4: Estructura Centralizada (Horizontal / Chata)",
-            subtitulo = "Tramo de control amplio en la cúpula | Menos niveles jerárquicos intermedios",
-            resumenVictoria = "<b>Concepto validado: Centralización y Estructura Chata</b>\n\nCon un tramo de control amplio y menos eslabones intermedios, la Dirección retiene la supervisión cercana, acortando la distancia entre la estrategia y la operación.",
+            titulo = "Nivel 4: Estructura Centralizada (Chata)",
+            subtitulo = "Tramo de control amplio en la cúpula | Menos niveles intermedios",
+            resumenVictoria = "<b>Concepto validado: Centralización y Estructura Chata</b>\n\nCon un tramo de control amplio y menos eslabones intermedios, la Dirección retiene la supervisión cercana, acortando la cadena jerárquica.",
             cantidadNodos = 8,
             criterio = CriterioDepartamentalizacion.Funcional,
             autoridad = ModoAutoridad.Centralizada,
@@ -78,8 +78,8 @@ public class LevelManager : MonoBehaviour
         },
         new ConfiguracionNivelAcademico
         {
-            titulo = "Nivel 5: Estructura Descentralizada (Vertical / Alta)",
-            subtitulo = "Tramo de control estrecho | Delegación obligatoria en Directores y Gerentes",
+            titulo = "Nivel 5: Estructura Descentralizada (Vertical)",
+            subtitulo = "Tramo de control estrecho | Delegación obligatoria en mandos medios",
             resumenVictoria = "<b>Concepto validado: Descentralización y Delegación</b>\n\nCon tramos de control ajustados, el CEO delega la autoridad táctica en Directores y Gerentes sin generar cuellos de botella en la cima estratégica.",
             cantidadNodos = 11,
             criterio = CriterioDepartamentalizacion.Funcional,
@@ -96,6 +96,7 @@ public class LevelManager : MonoBehaviour
 
     public void IniciarJuego()
     {
+        NormalizarLayoutVerticalMovil();
         CrearCabeceraAcademicaUI();
         CargarNivelActual();
 
@@ -103,6 +104,57 @@ public class LevelManager : MonoBehaviour
         {
             TutorialManager.Instance.IniciarTutorial();
         }
+    }
+
+    /// <summary>
+    /// Corrige el CanvasScaler y todos los RectTransforms de la escena para que encajen siempre
+    /// dentro de cualquier pantalla móvil vertical (9:16, 9:18, 9:20) sin desbordarse.
+    /// </summary>
+    private void NormalizarLayoutVerticalMovil()
+    {
+        Canvas mainCanvas = FindFirstObjectByType<Canvas>();
+        if (mainCanvas == null) return;
+
+        // 1. Ajustar CanvasScaler para que escale combinando ancho y alto (evita desbordes verticales y horizontales)
+        CanvasScaler scaler = mainCanvas.GetComponent<CanvasScaler>();
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        // 2. Ajustar SpawnArea para dejar margen superior (cabecera + racha) e inferior (comodín + mensajes)
+        if (ProceduralLevelGenerator.Instance != null && ProceduralLevelGenerator.Instance.spawnArea != null)
+        {
+            RectTransform spawnRt = ProceduralLevelGenerator.Instance.spawnArea;
+            spawnRt.localScale = Vector3.one;
+            spawnRt.anchorMin = new Vector2(0.03f, 0.16f);
+            spawnRt.anchorMax = new Vector2(0.97f, 0.82f);
+            spawnRt.offsetMin = Vector2.zero;
+            spawnRt.offsetMax = Vector2.zero;
+        }
+
+        // 3. Ajustar TextRacha en la esquina superior izquierda (sin márgenes negativos que se salgan del Canvas)
+        if (StreakUI.Instance != null && StreakUI.Instance.textoRacha != null)
+        {
+            TextMeshProUGUI txtRacha = StreakUI.Instance.textoRacha;
+            RectTransform rachaRt = txtRacha.GetComponent<RectTransform>();
+            rachaRt.localScale = Vector3.one;
+            rachaRt.anchorMin = new Vector2(0.04f, 0.92f);
+            rachaRt.anchorMax = new Vector2(0.45f, 0.985f);
+            rachaRt.offsetMin = Vector2.zero;
+            rachaRt.offsetMax = Vector2.zero;
+
+            txtRacha.margin = Vector4.zero;
+            txtRacha.alignment = TextAlignmentOptions.MidlineLeft;
+            txtRacha.enableAutoSizing = true;
+            txtRacha.fontSizeMin = 28f;
+            txtRacha.fontSizeMax = 48f;
+        }
+
+        Canvas.ForceUpdateCanvases();
     }
 
     public void LimpiarNodosRegistrados()
@@ -160,7 +212,6 @@ public class LevelManager : MonoBehaviour
         }
         else
         {
-            // Modo Puzzle Diario Procedural infinito tras completar los 5 niveles teóricos
             int numDia = indiceNivelCampana - nivelesCampana.Length + 1;
             int seed = ProceduralLevelGenerator.ObtenerSemillaDiaria() + (numDia * 37);
 
@@ -176,7 +227,7 @@ public class LevelManager : MonoBehaviour
 
             ActualizarCabeceraUI(
                 $"Desafío Diario #{numDia}: {criterioActual}",
-                $"Modo {modoAutoridadActual} | Semilla #{seed} | Doble clic en un nodo para desconectar"
+                $"Modo {modoAutoridadActual} | Doble toque en un nodo para desconectar"
             );
 
             ProceduralLevelGenerator.Instance.GenerarNivelAcademico(seed, 10, criterioActual, modoAutoridadActual);
@@ -186,7 +237,6 @@ public class LevelManager : MonoBehaviour
     public void AvanzarSiguienteNivel()
     {
         indiceNivelCampana++;
-        // Recompensamos 1 comodín cada 2 niveles superados para facilitar pruebas de reestructuración
         if (indiceNivelCampana % 2 == 0 && WildcardManager.Instance != null)
         {
             WildcardManager.Instance.RecompensarComodin(1);
@@ -199,9 +249,6 @@ public class LevelManager : MonoBehaviour
         CargarNivelActual();
     }
 
-    /// <summary>
-    /// Se llama cada vez que el jugador hace una conexión exitosa.
-    /// </summary>
     public void EvaluarVictoria()
     {
         if (nivelYaCompletado) return;
@@ -253,7 +300,6 @@ public class LevelManager : MonoBehaviour
         Canvas mainCanvas = FindFirstObjectByType<Canvas>();
         if (mainCanvas == null) return;
 
-        // Ponemos un fondo de color sobrio corporativo a la cámara para mejorar el contraste visual
         if (Camera.main != null)
         {
             Camera.main.backgroundColor = new Color(0.12f, 0.16f, 0.22f, 1f);
@@ -263,53 +309,88 @@ public class LevelManager : MonoBehaviour
         headerPanel.transform.SetParent(mainCanvas.transform, false);
         headerPanel.transform.SetAsFirstSibling();
 
+        // Anclado en porcentaje entre el 83% y el 91.5% de la altura del teléfono
         RectTransform rt = headerPanel.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0f, 1f);
-        rt.anchorMax = new Vector2(1f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = new Vector2(0f, -110f);
-        rt.sizeDelta = new Vector2(-40f, 135f);
+        rt.anchorMin = new Vector2(0.03f, 0.83f);
+        rt.anchorMax = new Vector2(0.97f, 0.915f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
 
         Image bg = headerPanel.GetComponent<Image>();
-        bg.color = new Color(0.08f, 0.11f, 0.16f, 0.88f);
+        bg.color = new Color(0.08f, 0.11f, 0.16f, 0.92f);
         bg.raycastTarget = false;
 
         // Título del nivel
         GameObject titleObj = new GameObject("HeaderTitle", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         titleObj.transform.SetParent(headerPanel.transform, false);
         RectTransform titleRt = titleObj.GetComponent<RectTransform>();
-        titleRt.anchorMin = new Vector2(0f, 0.48f);
-        titleRt.anchorMax = new Vector2(1f, 1f);
-        titleRt.offsetMin = new Vector2(20f, 0f);
-        titleRt.offsetMax = new Vector2(-20f, -8f);
+        titleRt.anchorMin = new Vector2(0.03f, 0.48f);
+        titleRt.anchorMax = new Vector2(0.97f, 0.96f);
+        titleRt.offsetMin = Vector2.zero;
+        titleRt.offsetMax = Vector2.zero;
 
         headerTitleText = titleObj.GetComponent<TextMeshProUGUI>();
-        headerTitleText.fontSize = 30f;
         headerTitleText.fontStyle = FontStyles.Bold;
         headerTitleText.alignment = TextAlignmentOptions.Center;
         headerTitleText.color = new Color(0.95f, 0.85f, 0.35f);
         headerTitleText.enableAutoSizing = true;
-        headerTitleText.fontSizeMin = 20f;
-        headerTitleText.fontSizeMax = 32f;
+        headerTitleText.fontSizeMin = 16f;
+        headerTitleText.fontSizeMax = 28f;
         headerTitleText.raycastTarget = false;
 
         // Subtítulo de reglas
         GameObject subObj = new GameObject("HeaderSubtitle", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         subObj.transform.SetParent(headerPanel.transform, false);
         RectTransform subRt = subObj.GetComponent<RectTransform>();
-        subRt.anchorMin = new Vector2(0f, 0f);
-        subRt.anchorMax = new Vector2(1f, 0.50f);
-        subRt.offsetMin = new Vector2(20f, 8f);
-        subRt.offsetMax = new Vector2(-20f, 0f);
+        subRt.anchorMin = new Vector2(0.03f, 0.06f);
+        subRt.anchorMax = new Vector2(0.97f, 0.48f);
+        subRt.offsetMin = Vector2.zero;
+        subRt.offsetMax = Vector2.zero;
 
         headerSubText = subObj.GetComponent<TextMeshProUGUI>();
-        headerSubText.fontSize = 21f;
         headerSubText.alignment = TextAlignmentOptions.Center;
         headerSubText.color = new Color(0.85f, 0.90f, 0.96f);
         headerSubText.enableAutoSizing = true;
-        headerSubText.fontSizeMin = 15f;
-        headerSubText.fontSizeMax = 22f;
+        headerSubText.fontSizeMin = 13f;
+        headerSubText.fontSizeMax = 21f;
         headerSubText.raycastTarget = false;
+
+        // Botón rápido para reiniciar el nivel en la esquina superior derecha
+        CrearBotonReiniciarUI(mainCanvas.transform);
+    }
+
+    private void CrearBotonReiniciarUI(Transform canvasTransform)
+    {
+        GameObject btnObj = new GameObject("BotonReiniciarNivel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(canvasTransform, false);
+
+        RectTransform rt = btnObj.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.68f, 0.925f);
+        rt.anchorMax = new Vector2(0.96f, 0.98f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = btnObj.GetComponent<Image>();
+        img.color = new Color(0.22f, 0.28f, 0.38f, 0.95f);
+
+        Button btn = btnObj.GetComponent<Button>();
+        btn.onClick.AddListener(ReiniciarNivelActual);
+
+        GameObject txtObj = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        txtObj.transform.SetParent(btnObj.transform, false);
+        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+        txtRt.anchorMin = Vector2.zero;
+        txtRt.anchorMax = Vector2.one;
+        txtRt.offsetMin = new Vector2(8f, 4f);
+        txtRt.offsetMax = new Vector2(-8f, -4f);
+
+        TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
+        tmp.text = "↻ Reiniciar";
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = Color.white;
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMin = 14f;
+        tmp.fontSizeMax = 24f;
     }
 
     private void ActualizarCabeceraUI(string titulo, string subtitulo)

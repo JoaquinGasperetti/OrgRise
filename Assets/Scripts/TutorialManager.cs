@@ -19,9 +19,9 @@ public class TutorialManager : MonoBehaviour
     private readonly string[] instrucciones = new string[]
     {
         "<b>🏢 Bienvenido a OrgRise</b>\n\nTu objetivo es diseñar estructuras organizacionales eficientes aplicando los principios de <b>Gestión de la Organización</b>.",
-        "<b>1. Cadena y Unidad de Mando</b>\n\nArrastrá una línea entre un subordinado y su jefe inmediato (Gerente → Director → CEO). Ahora hacé tu primera conexión válida en el tablero.",
-        "<b>2. Tramo de Control (Span of Control)</b>\n\n¡Bien hecho! Cada superior tiene un límite máximo de reportes directos (<b>Tramo: X/Max</b>). Si lo superás, se produce un cuello de botella.",
-        "<b>3. Departamentalización y Reestructuración</b>\n\nRespetá el color/área de cada unidad. Podés hacer <b>doble clic</b> sobre un nodo para desconectarlo, o usar el <b>Comodín</b> para mover una rama completa.\n\n¡Completá el organigrama!"
+        "<b>1. Cadena y Unidad de Mando</b>\n\nArrastrá una línea entre un subordinado y su jefe inmediato (Empleado → Gerente → Director → CEO).\n\nPodés cerrar este aviso y hacer tu primera conexión.",
+        "<b>2. Tramo de Control</b>\n\nCada superior tiene un límite máximo de reportes directos (<b>Tramo: X/Max</b>). Si lo superás, se produce un cuello de botella.",
+        "<b>3. Departamentalización y Reestructuración</b>\n\nRespetá el área/color de cada unidad. Hacé <b>doble toque</b> sobre un nodo para desconectarlo, o usá el <b>Comodín</b> para mover una rama completa."
     };
 
     void Awake()
@@ -32,7 +32,7 @@ public class TutorialManager : MonoBehaviour
 
     void Start()
     {
-        ConfigurarEsteticaPanel();
+        ConfigurarEsteticaPanelVertical();
 
         if (botonContinuar != null)
         {
@@ -40,30 +40,87 @@ public class TutorialManager : MonoBehaviour
             botonContinuar.onClick.AddListener(AlPresionarBotonPrincipal);
         }
 
-        // Si LevelManager aún no llamó a IniciarTutorial, lo iniciamos automáticamente
         if (!tutorialActivo && !enPantallaVictoria && !tutorialYaMostradoEnSesion)
         {
             IniciarTutorial();
         }
     }
 
-    private void ConfigurarEsteticaPanel()
+    /// <summary>
+    /// Corrige las escalas desproporcionadas (4.06x y 4.37x) que venían en SampleScene.unity
+    /// para que el cuadro de texto y el botón nunca se salgan de la pantalla móvil vertical.
+    /// </summary>
+    private void ConfigurarEsteticaPanelVertical()
     {
-        if (tutorialText != null)
-        {
-            tutorialText.enableAutoSizing = true;
-            tutorialText.fontSizeMin = 18f;
-            tutorialText.fontSizeMax = 30f;
-            tutorialText.alignment = TextAlignmentOptions.Center;
-        }
-
-        // Permitimos que el fondo oscuro no bloquee el arrastre de los nodos cuando estamos en el paso práctico
         if (tutorialPanel != null)
         {
+            RectTransform panelRt = tutorialPanel.GetComponent<RectTransform>();
+            if (panelRt != null)
+            {
+                panelRt.localScale = Vector3.one;
+                panelRt.anchorMin = Vector2.zero;
+                panelRt.anchorMax = Vector2.one;
+                panelRt.offsetMin = Vector2.zero;
+                panelRt.offsetMax = Vector2.zero;
+            }
+
             Image panelImg = tutorialPanel.GetComponent<Image>();
             if (panelImg != null)
             {
-                panelImg.raycastTarget = false;
+                panelImg.color = new Color(0.04f, 0.07f, 0.12f, 0.90f);
+                panelImg.raycastTarget = true;
+            }
+        }
+
+        if (tutorialText != null)
+        {
+            RectTransform txtRt = tutorialText.GetComponent<RectTransform>();
+            if (txtRt != null)
+            {
+                txtRt.localScale = Vector3.one;
+                txtRt.anchorMin = new Vector2(0.08f, 0.35f);
+                txtRt.anchorMax = new Vector2(0.92f, 0.78f);
+                txtRt.offsetMin = Vector2.zero;
+                txtRt.offsetMax = Vector2.zero;
+            }
+
+            tutorialText.margin = Vector4.zero;
+            tutorialText.enableAutoSizing = true;
+            tutorialText.fontSizeMin = 22f;
+            tutorialText.fontSizeMax = 38f;
+            tutorialText.alignment = TextAlignmentOptions.Center;
+        }
+
+        if (botonContinuar != null)
+        {
+            RectTransform btnRt = botonContinuar.GetComponent<RectTransform>();
+            if (btnRt != null)
+            {
+                btnRt.localScale = Vector3.one;
+                btnRt.anchorMin = new Vector2(0.20f, 0.20f);
+                btnRt.anchorMax = new Vector2(0.80f, 0.28f);
+                btnRt.offsetMin = Vector2.zero;
+                btnRt.offsetMax = Vector2.zero;
+            }
+
+            TextMeshProUGUI btnTxt = botonContinuar.GetComponentInChildren<TextMeshProUGUI>();
+            if (btnTxt != null)
+            {
+                RectTransform btnTxtRt = btnTxt.GetComponent<RectTransform>();
+                if (btnTxtRt != null)
+                {
+                    btnTxtRt.localScale = Vector3.one;
+                    btnTxtRt.anchorMin = Vector2.zero;
+                    btnTxtRt.anchorMax = Vector2.one;
+                    btnTxtRt.offsetMin = new Vector2(12f, 6f);
+                    btnTxtRt.offsetMax = new Vector2(-12f, -6f);
+                }
+                btnTxt.margin = Vector4.zero;
+                btnTxt.enableAutoSizing = true;
+                btnTxt.fontSizeMin = 20f;
+                btnTxt.fontSizeMax = 34f;
+                btnTxt.fontStyle = FontStyles.Bold;
+                btnTxt.alignment = TextAlignmentOptions.Center;
             }
         }
     }
@@ -76,12 +133,18 @@ public class TutorialManager : MonoBehaviour
             return;
         }
 
+        ConfigurarEsteticaPanelVertical();
+
         tutorialYaMostradoEnSesion = true;
         enPantallaVictoria = false;
         tutorialActivo = true;
         pasoActual = 0;
 
-        if (tutorialPanel != null) tutorialPanel.SetActive(true);
+        if (tutorialPanel != null)
+        {
+            tutorialPanel.SetActive(true);
+            tutorialPanel.transform.SetAsLastSibling();
+        }
         ActualizarTextoBoton("Continuar");
         MostrarPaso(pasoActual);
     }
@@ -101,10 +164,8 @@ public class TutorialManager : MonoBehaviour
 
         if (botonContinuar != null)
         {
-            // En el paso 1 invitamos a conectar un nodo, pero también dejamos el botón como "Entendido / Saltar"
-            // para que nunca se bloquee la partida si el usuario prefiere cerrar el cartel primero
             botonContinuar.gameObject.SetActive(true);
-            ActualizarTextoBoton(indice == instrucciones.Length - 1 ? "¡Empezar!" : "Continuar");
+            ActualizarTextoBoton(indice == instrucciones.Length - 1 ? "¡Empezar a Jugar!" : "Continuar");
         }
     }
 
@@ -137,9 +198,6 @@ public class TutorialManager : MonoBehaviour
         MostrarPaso(pasoActual);
     }
 
-    /// <summary>
-    /// Se llama desde UINodeInteraction cuando el jugador hace una conexión exitosa.
-    /// </summary>
     public void NotificarConexionExitosa()
     {
         if (tutorialActivo && pasoActual == 1)
@@ -155,11 +213,10 @@ public class TutorialManager : MonoBehaviour
         if (tutorialPanel != null) tutorialPanel.SetActive(false);
     }
 
-    /// <summary>
-    /// Muestra el resumen académico al completar un nivel y permite avanzar al siguiente desafío.
-    /// </summary>
     public void MostrarPantallaNivelCompletado(string resumenAcademico)
     {
+        ConfigurarEsteticaPanelVertical();
+
         tutorialActivo = false;
         enPantallaVictoria = true;
 
