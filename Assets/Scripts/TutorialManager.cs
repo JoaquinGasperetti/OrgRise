@@ -11,6 +11,8 @@ public class TutorialManager : MonoBehaviour
     public TextMeshProUGUI tutorialText;
     public Button botonContinuar;
 
+    private Button botonIrAlMenuEnVictoria;
+
     private int pasoActual = 0;
     private bool tutorialActivo = false;
     private bool enPantallaVictoria = false;
@@ -40,16 +42,23 @@ public class TutorialManager : MonoBehaviour
             botonContinuar.onClick.AddListener(AlPresionarBotonPrincipal);
         }
 
-        if (!tutorialActivo && !enPantallaVictoria && !tutorialYaMostradoEnSesion)
+        // Si no hay LevelManager (escena aislada), iniciamos el tutorial; de lo contrario, LevelManager abre primero el Menú Principal
+        if (LevelManager.Instance == null && !tutorialActivo && !enPantallaVictoria && !tutorialYaMostradoEnSesion)
         {
             IniciarTutorial();
         }
     }
 
-    /// <summary>
-    /// Corrige las escalas desproporcionadas (4.06x y 4.37x) que venían en SampleScene.unity
-    /// para que el cuadro de texto y el botón nunca se salgan de la pantalla móvil vertical.
-    /// </summary>
+    public void OcultarPanelInmediato()
+    {
+        tutorialActivo = false;
+        enPantallaVictoria = false;
+        if (tutorialPanel != null)
+        {
+            tutorialPanel.SetActive(false);
+        }
+    }
+
     private void ConfigurarEsteticaPanelVertical()
     {
         if (tutorialPanel != null)
@@ -67,7 +76,7 @@ public class TutorialManager : MonoBehaviour
             Image panelImg = tutorialPanel.GetComponent<Image>();
             if (panelImg != null)
             {
-                panelImg.color = new Color(0.04f, 0.07f, 0.12f, 0.90f);
+                panelImg.color = new Color(0.04f, 0.07f, 0.12f, 0.92f);
                 panelImg.raycastTarget = true;
             }
         }
@@ -78,16 +87,16 @@ public class TutorialManager : MonoBehaviour
             if (txtRt != null)
             {
                 txtRt.localScale = Vector3.one;
-                txtRt.anchorMin = new Vector2(0.08f, 0.35f);
-                txtRt.anchorMax = new Vector2(0.92f, 0.78f);
+                txtRt.anchorMin = new Vector2(0.08f, 0.36f);
+                txtRt.anchorMax = new Vector2(0.92f, 0.80f);
                 txtRt.offsetMin = Vector2.zero;
                 txtRt.offsetMax = Vector2.zero;
             }
 
             tutorialText.margin = Vector4.zero;
             tutorialText.enableAutoSizing = true;
-            tutorialText.fontSizeMin = 22f;
-            tutorialText.fontSizeMax = 38f;
+            tutorialText.fontSizeMin = 20f;
+            tutorialText.fontSizeMax = 36f;
             tutorialText.alignment = TextAlignmentOptions.Center;
         }
 
@@ -97,8 +106,8 @@ public class TutorialManager : MonoBehaviour
             if (btnRt != null)
             {
                 btnRt.localScale = Vector3.one;
-                btnRt.anchorMin = new Vector2(0.20f, 0.20f);
-                btnRt.anchorMax = new Vector2(0.80f, 0.28f);
+                btnRt.anchorMin = new Vector2(0.18f, 0.22f);
+                btnRt.anchorMax = new Vector2(0.82f, 0.30f);
                 btnRt.offsetMin = Vector2.zero;
                 btnRt.offsetMax = Vector2.zero;
             }
@@ -117,12 +126,62 @@ public class TutorialManager : MonoBehaviour
                 }
                 btnTxt.margin = Vector4.zero;
                 btnTxt.enableAutoSizing = true;
-                btnTxt.fontSizeMin = 20f;
-                btnTxt.fontSizeMax = 34f;
+                btnTxt.fontSizeMin = 18f;
+                btnTxt.fontSizeMax = 32f;
                 btnTxt.fontStyle = FontStyles.Bold;
                 btnTxt.alignment = TextAlignmentOptions.Center;
             }
         }
+
+        AsegurarBotonMenuEnModal();
+    }
+
+    private void AsegurarBotonMenuEnModal()
+    {
+        if (botonIrAlMenuEnVictoria != null || tutorialPanel == null) return;
+
+        GameObject btnObj = new GameObject("BotonVolverAlMenu", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(tutorialPanel.transform, false);
+
+        RectTransform rt = btnObj.GetComponent<RectTransform>();
+        rt.localScale = Vector3.one;
+        rt.anchorMin = new Vector2(0.18f, 0.12f);
+        rt.anchorMax = new Vector2(0.82f, 0.195f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = btnObj.GetComponent<Image>();
+        img.color = new Color(0.20f, 0.27f, 0.38f, 1f);
+
+        botonIrAlMenuEnVictoria = btnObj.GetComponent<Button>();
+        botonIrAlMenuEnVictoria.onClick.AddListener(() =>
+        {
+            OcultarPanelInmediato();
+            if (LevelManager.Instance != null)
+            {
+                LevelManager.Instance.MostrarMenuPrincipal();
+            }
+        });
+
+        GameObject txtObj = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        txtObj.transform.SetParent(btnObj.transform, false);
+        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+        txtRt.localScale = Vector3.one;
+        txtRt.anchorMin = Vector2.zero;
+        txtRt.anchorMax = Vector2.one;
+        txtRt.offsetMin = new Vector2(10f, 4f);
+        txtRt.offsetMax = new Vector2(-10f, -4f);
+
+        TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
+        tmp.text = "☰ Selector de Niveles / Menú";
+        tmp.color = Color.white;
+        tmp.fontStyle = FontStyles.Bold;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMin = 16f;
+        tmp.fontSizeMax = 26f;
+
+        btnObj.SetActive(false);
     }
 
     public void IniciarTutorial()
@@ -139,6 +198,11 @@ public class TutorialManager : MonoBehaviour
         enPantallaVictoria = false;
         tutorialActivo = true;
         pasoActual = 0;
+
+        if (botonIrAlMenuEnVictoria != null)
+        {
+            botonIrAlMenuEnVictoria.gameObject.SetActive(false);
+        }
 
         if (tutorialPanel != null)
         {
@@ -235,6 +299,11 @@ public class TutorialManager : MonoBehaviour
         {
             botonContinuar.gameObject.SetActive(true);
             ActualizarTextoBoton("Siguiente Nivel ➔");
+        }
+
+        if (botonIrAlMenuEnVictoria != null)
+        {
+            botonIrAlMenuEnVictoria.gameObject.SetActive(true);
         }
     }
 

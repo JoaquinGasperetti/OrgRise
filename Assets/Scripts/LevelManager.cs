@@ -18,13 +18,26 @@ public class LevelManager : MonoBehaviour
     public ModoAutoridad modoAutoridadActual = ModoAutoridad.Equilibrada;
     public bool ExigirCadenaEstricta = true;
     private bool nivelYaCompletado = false;
+    private bool enModoDiario = false;
+    private int numeroDesafioDiario = 1;
 
-    // UI de Cabecera Académica
+    // UI de Cabecera Académica y Navegación
+    private GameObject headerPanelObj;
     private TextMeshProUGUI headerTitleText;
     private TextMeshProUGUI headerSubText;
+    private GameObject topButtonsContainer;
 
-    private struct ConfiguracionNivelAcademico
+    // UI de Menú Principal, Selector de Nivel y Glosario
+    private GameObject mainMenuPanel;
+    private GameObject mainHomeView;
+    private GameObject levelSelectorView;
+    private GameObject glossaryView;
+    private TextMeshProUGUI menuStreakBadgeText;
+
+    public struct ConfiguracionNivelAcademico
     {
+        public string nombreCorto;
+        public string etiquetaConcepto;
         public string titulo;
         public string subtitulo;
         public string resumenVictoria;
@@ -34,10 +47,12 @@ public class LevelManager : MonoBehaviour
         public int semillaBase;
     }
 
-    private readonly ConfiguracionNivelAcademico[] nivelesCampana = new ConfiguracionNivelAcademico[]
+    public readonly ConfiguracionNivelAcademico[] nivelesCampana = new ConfiguracionNivelAcademico[]
     {
         new ConfiguracionNivelAcademico
         {
+            nombreCorto = "Nivel 1: Cadena y Tramo de Control",
+            etiquetaConcepto = "Fayol • Jerarquía Lineal-Funcional",
             titulo = "Nivel 1: Cadena de Mando y Tramo de Control",
             subtitulo = "Departamentalización Funcional | Conectá cada rol respetando su área y cupo",
             resumenVictoria = "<b>Concepto validado: Cadena de Mando y Tramo de Control</b>\n\nEstableciste la línea de autoridad formal desde el Nivel Operativo hasta el Nivel Estratégico (CEO) sin superar la capacidad de supervisión directa de ningún mando.",
@@ -48,6 +63,8 @@ public class LevelManager : MonoBehaviour
         },
         new ConfiguracionNivelAcademico
         {
+            nombreCorto = "Nivel 2: Departamentalización por Producto",
+            etiquetaConcepto = "Estructura Divisional • Unidades de Negocio",
             titulo = "Nivel 2: Departamentalización por Producto",
             subtitulo = "Agrupamiento por División (PyMEs, Consumo, Industria) | Unidad de Mando",
             resumenVictoria = "<b>Concepto validado: Departamentalización por Producto</b>\n\nAgrupaste los roles según la línea de producto/servicio que atienden, facilitando la coordinación autónoma de cada unidad de negocio.",
@@ -58,6 +75,8 @@ public class LevelManager : MonoBehaviour
         },
         new ConfiguracionNivelAcademico
         {
+            nombreCorto = "Nivel 3: Departamentalización Geográfica",
+            etiquetaConcepto = "Cobertura Territorial • Regiones Operativas",
             titulo = "Nivel 3: Departamentalización Geográfica",
             subtitulo = "Agrupamiento Territorial (Norte, Centro, Sur) | Gestión regional",
             resumenVictoria = "<b>Concepto validado: Departamentalización Geográfica</b>\n\nOrganizaste las operaciones por zonas territoriales para responder con agilidad a las demandas de cada región.",
@@ -68,6 +87,8 @@ public class LevelManager : MonoBehaviour
         },
         new ConfiguracionNivelAcademico
         {
+            nombreCorto = "Nivel 4: Estructura Centralizada (Chata)",
+            etiquetaConcepto = "Tramo Amplio • Supervisión Directa",
             titulo = "Nivel 4: Estructura Centralizada (Chata)",
             subtitulo = "Tramo de control amplio en la cúpula | Menos niveles intermedios",
             resumenVictoria = "<b>Concepto validado: Centralización y Estructura Chata</b>\n\nCon un tramo de control amplio y menos eslabones intermedios, la Dirección retiene la supervisión cercana, acortando la cadena jerárquica.",
@@ -78,6 +99,8 @@ public class LevelManager : MonoBehaviour
         },
         new ConfiguracionNivelAcademico
         {
+            nombreCorto = "Nivel 5: Estructura Descentralizada (Vertical)",
+            etiquetaConcepto = "Tramo Estrecho • Delegación Táctica",
             titulo = "Nivel 5: Estructura Descentralizada (Vertical)",
             subtitulo = "Tramo de control estrecho | Delegación obligatoria en mandos medios",
             resumenVictoria = "<b>Concepto validado: Descentralización y Delegación</b>\n\nCon tramos de control ajustados, el CEO delega la autoridad táctica en Directores y Gerentes sin generar cuellos de botella en la cima estratégica.",
@@ -98,24 +121,22 @@ public class LevelManager : MonoBehaviour
     {
         NormalizarLayoutVerticalMovil();
         CrearCabeceraAcademicaUI();
-        CargarNivelActual();
+        CrearMenuPrincipalUI();
 
+        // Al abrir la app mostramos el Menú Principal (ocultando cualquier modal abierto del tutorial hasta que empiece a jugar)
         if (TutorialManager.Instance != null)
         {
-            TutorialManager.Instance.IniciarTutorial();
+            TutorialManager.Instance.OcultarPanelInmediato();
         }
+
+        MostrarMenuPrincipal();
     }
 
-    /// <summary>
-    /// Corrige el CanvasScaler y todos los RectTransforms de la escena para que encajen siempre
-    /// dentro de cualquier pantalla móvil vertical (9:16, 9:18, 9:20) sin desbordarse.
-    /// </summary>
     private void NormalizarLayoutVerticalMovil()
     {
         Canvas mainCanvas = FindFirstObjectByType<Canvas>();
         if (mainCanvas == null) return;
 
-        // 1. Ajustar CanvasScaler para que escale combinando ancho y alto (evita desbordes verticales y horizontales)
         CanvasScaler scaler = mainCanvas.GetComponent<CanvasScaler>();
         if (scaler != null)
         {
@@ -125,7 +146,6 @@ public class LevelManager : MonoBehaviour
             scaler.matchWidthOrHeight = 0.5f;
         }
 
-        // 2. Ajustar SpawnArea para dejar margen superior (cabecera + racha) e inferior (comodín + mensajes)
         if (ProceduralLevelGenerator.Instance != null && ProceduralLevelGenerator.Instance.spawnArea != null)
         {
             RectTransform spawnRt = ProceduralLevelGenerator.Instance.spawnArea;
@@ -136,22 +156,21 @@ public class LevelManager : MonoBehaviour
             spawnRt.offsetMax = Vector2.zero;
         }
 
-        // 3. Ajustar TextRacha en la esquina superior izquierda (sin márgenes negativos que se salgan del Canvas)
         if (StreakUI.Instance != null && StreakUI.Instance.textoRacha != null)
         {
             TextMeshProUGUI txtRacha = StreakUI.Instance.textoRacha;
             RectTransform rachaRt = txtRacha.GetComponent<RectTransform>();
             rachaRt.localScale = Vector3.one;
-            rachaRt.anchorMin = new Vector2(0.04f, 0.92f);
-            rachaRt.anchorMax = new Vector2(0.45f, 0.985f);
+            rachaRt.anchorMin = new Vector2(0.04f, 0.925f);
+            rachaRt.anchorMax = new Vector2(0.32f, 0.985f);
             rachaRt.offsetMin = Vector2.zero;
             rachaRt.offsetMax = Vector2.zero;
 
             txtRacha.margin = Vector4.zero;
             txtRacha.alignment = TextAlignmentOptions.MidlineLeft;
             txtRacha.enableAutoSizing = true;
-            txtRacha.fontSizeMin = 28f;
-            txtRacha.fontSizeMax = 48f;
+            txtRacha.fontSizeMin = 24f;
+            txtRacha.fontSizeMax = 44f;
         }
 
         Canvas.ForceUpdateCanvases();
@@ -196,11 +215,78 @@ public class LevelManager : MonoBehaviour
         return depto.ToString();
     }
 
+    // ==================== NAVEGACIÓN DE MENÚ PRINCIPAL Y MODOS ====================
+
+    public void MostrarMenuPrincipal()
+    {
+        if (mainMenuPanel == null) CrearMenuPrincipalUI();
+        if (mainMenuPanel != null)
+        {
+            mainMenuPanel.SetActive(true);
+            mainMenuPanel.transform.SetAsLastSibling();
+        }
+
+        CambiarSubvistaMenu("home");
+
+        if (menuStreakBadgeText != null && DailyStreakManager.Instance != null)
+        {
+            int racha = DailyStreakManager.Instance.currentStreak;
+            string estadoHoy = DailyStreakManager.Instance.alreadyPlayedToday ? "Completado hoy ✓" : "Disponible hoy";
+            menuStreakBadgeText.text = $"🔥 Racha: <b>{racha} días</b>  |   Puzzle Diario: <color=#80CBC4>{estadoHoy}</color>";
+        }
+    }
+
+    private void OcultarMenuPrincipal()
+    {
+        if (mainMenuPanel != null)
+        {
+            mainMenuPanel.SetActive(false);
+        }
+    }
+
+    private void CambiarSubvistaMenu(string vista)
+    {
+        if (mainHomeView != null) mainHomeView.SetActive(vista == "home");
+        if (levelSelectorView != null) levelSelectorView.SetActive(vista == "selector");
+        if (glossaryView != null) glossaryView.SetActive(vista == "glossary");
+    }
+
+    public void IniciarNivelCampanaDesdeMenu(int indice)
+    {
+        enModoDiario = false;
+        indiceNivelCampana = Mathf.Clamp(indice, 0, nivelesCampana.Length - 1);
+        OcultarMenuPrincipal();
+        CargarNivelActual();
+
+        // Si eligen el Nivel 1 y aún no vieron el tutorial en esta sesión, lo mostramos
+        if (indiceNivelCampana == 0 && TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.IniciarTutorial();
+        }
+    }
+
+    public void IniciarDesafioDiarioDesdeMenu()
+    {
+        enModoDiario = true;
+        OcultarMenuPrincipal();
+        CargarNivelActual();
+
+        if (FeedbackManager.Instance != null)
+        {
+            int seed = ProceduralLevelGenerator.ObtenerSemillaDiaria();
+            FeedbackManager.Instance.MostrarMensajeEstado(
+                $"📅 Puzzle Diario iniciado (Semilla #{seed}). ¡Armá el organigrama para sumar a tu racha!",
+                new Color(0.14f, 0.36f, 0.54f, 0.95f),
+                3.2f
+            );
+        }
+    }
+
     public void CargarNivelActual()
     {
         if (ProceduralLevelGenerator.Instance == null) return;
 
-        if (indiceNivelCampana < nivelesCampana.Length)
+        if (!enModoDiario && indiceNivelCampana < nivelesCampana.Length)
         {
             ConfiguracionNivelAcademico cfg = nivelesCampana[indiceNivelCampana];
             criterioActual = cfg.criterio;
@@ -212,8 +298,8 @@ public class LevelManager : MonoBehaviour
         }
         else
         {
-            int numDia = indiceNivelCampana - nivelesCampana.Length + 1;
-            int seed = ProceduralLevelGenerator.ObtenerSemillaDiaria() + (numDia * 37);
+            enModoDiario = true;
+            int seed = ProceduralLevelGenerator.ObtenerSemillaDiaria() + ((numeroDesafioDiario - 1) * 37);
 
             CriterioDepartamentalizacion[] criterios = {
                 CriterioDepartamentalizacion.Funcional,
@@ -221,13 +307,15 @@ public class LevelManager : MonoBehaviour
                 CriterioDepartamentalizacion.Geografica,
                 CriterioDepartamentalizacion.Matricial
             };
-            criterioActual = criterios[numDia % criterios.Length];
-            modoAutoridadActual = (numDia % 3 == 0) ? ModoAutoridad.Descentralizada : ModoAutoridad.Equilibrada;
+            criterioActual = criterios[(seed + numeroDesafioDiario) % criterios.Length];
+            modoAutoridadActual = (numeroDesafioDiario % 3 == 0)
+                ? ModoAutoridad.Descentralizada
+                : ((numeroDesafioDiario % 2 == 0) ? ModoAutoridad.Centralizada : ModoAutoridad.Equilibrada);
             ExigirCadenaEstricta = true;
 
             ActualizarCabeceraUI(
-                $"Desafío Diario #{numDia}: {criterioActual}",
-                $"Modo {modoAutoridadActual} | Doble toque en un nodo para desconectar"
+                $"📅 Desafío Diario #{numeroDesafioDiario}: Criterio {criterioActual}",
+                $"Autoridad {modoAutoridadActual} | Semilla #{seed} | Doble toque para desconectar"
             );
 
             ProceduralLevelGenerator.Instance.GenerarNivelAcademico(seed, 10, criterioActual, modoAutoridadActual);
@@ -236,17 +324,35 @@ public class LevelManager : MonoBehaviour
 
     public void AvanzarSiguienteNivel()
     {
-        indiceNivelCampana++;
-        if (indiceNivelCampana % 2 == 0 && WildcardManager.Instance != null)
+        if (enModoDiario)
+        {
+            numeroDesafioDiario++;
+        }
+        else
+        {
+            indiceNivelCampana++;
+            if (indiceNivelCampana >= nivelesCampana.Length)
+            {
+                enModoDiario = true;
+                numeroDesafioDiario = 1;
+            }
+        }
+
+        if (WildcardManager.Instance != null && (indiceNivelCampana % 2 == 0 || enModoDiario))
         {
             WildcardManager.Instance.RecompensarComodin(1);
         }
+
         CargarNivelActual();
     }
 
     public void ReiniciarNivelActual()
     {
         CargarNivelActual();
+        if (FeedbackManager.Instance != null)
+        {
+            FeedbackManager.Instance.MostrarMensajeEstado("↻ Tablero reiniciado.", new Color(0.22f, 0.28f, 0.38f, 0.92f), 1.6f);
+        }
     }
 
     public void EvaluarVictoria()
@@ -279,9 +385,9 @@ public class LevelManager : MonoBehaviour
     {
         yield return new WaitForSeconds(espera);
 
-        string resumen = indiceNivelCampana < nivelesCampana.Length
+        string resumen = (!enModoDiario && indiceNivelCampana < nivelesCampana.Length)
             ? nivelesCampana[indiceNivelCampana].resumenVictoria
-            : $"<b>¡Desafío Organizacional Completado!</b>\n\nResolviste correctamente el organigrama bajo criterio <b>{criterioActual}</b> y autoridad <b>{modoAutoridadActual}</b>.";
+            : $"<b>¡Desafío Diario #{numeroDesafioDiario} Completado!</b>\n\nResolviste correctamente el organigrama bajo departamentalización <b>{criterioActual}</b> y autoridad <b>{modoAutoridadActual}</b>.";
 
         if (TutorialManager.Instance != null)
         {
@@ -293,6 +399,8 @@ public class LevelManager : MonoBehaviour
         }
     }
 
+    // ==================== CONSTRUCCIÓN DE CABECERA Y BOTONES DE JUEGO ====================
+
     private void CrearCabeceraAcademicaUI()
     {
         if (headerTitleText != null) return;
@@ -302,27 +410,25 @@ public class LevelManager : MonoBehaviour
 
         if (Camera.main != null)
         {
-            Camera.main.backgroundColor = new Color(0.12f, 0.16f, 0.22f, 1f);
+            Camera.main.backgroundColor = new Color(0.11f, 0.15f, 0.21f, 1f);
         }
 
-        GameObject headerPanel = new GameObject("AcademicHeaderPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        headerPanel.transform.SetParent(mainCanvas.transform, false);
-        headerPanel.transform.SetAsFirstSibling();
+        headerPanelObj = new GameObject("AcademicHeaderPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        headerPanelObj.transform.SetParent(mainCanvas.transform, false);
+        headerPanelObj.transform.SetAsFirstSibling();
 
-        // Anclado en porcentaje entre el 83% y el 91.5% de la altura del teléfono
-        RectTransform rt = headerPanel.GetComponent<RectTransform>();
+        RectTransform rt = headerPanelObj.GetComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.03f, 0.83f);
         rt.anchorMax = new Vector2(0.97f, 0.915f);
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
 
-        Image bg = headerPanel.GetComponent<Image>();
-        bg.color = new Color(0.08f, 0.11f, 0.16f, 0.92f);
+        Image bg = headerPanelObj.GetComponent<Image>();
+        bg.color = new Color(0.07f, 0.10f, 0.15f, 0.94f);
         bg.raycastTarget = false;
 
-        // Título del nivel
         GameObject titleObj = new GameObject("HeaderTitle", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        titleObj.transform.SetParent(headerPanel.transform, false);
+        titleObj.transform.SetParent(headerPanelObj.transform, false);
         RectTransform titleRt = titleObj.GetComponent<RectTransform>();
         titleRt.anchorMin = new Vector2(0.03f, 0.48f);
         titleRt.anchorMax = new Vector2(0.97f, 0.96f);
@@ -332,15 +438,14 @@ public class LevelManager : MonoBehaviour
         headerTitleText = titleObj.GetComponent<TextMeshProUGUI>();
         headerTitleText.fontStyle = FontStyles.Bold;
         headerTitleText.alignment = TextAlignmentOptions.Center;
-        headerTitleText.color = new Color(0.95f, 0.85f, 0.35f);
+        headerTitleText.color = new Color(0.96f, 0.85f, 0.35f);
         headerTitleText.enableAutoSizing = true;
-        headerTitleText.fontSizeMin = 16f;
-        headerTitleText.fontSizeMax = 28f;
+        headerTitleText.fontSizeMin = 15f;
+        headerTitleText.fontSizeMax = 27f;
         headerTitleText.raycastTarget = false;
 
-        // Subtítulo de reglas
         GameObject subObj = new GameObject("HeaderSubtitle", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        subObj.transform.SetParent(headerPanel.transform, false);
+        subObj.transform.SetParent(headerPanelObj.transform, false);
         RectTransform subRt = subObj.GetComponent<RectTransform>();
         subRt.anchorMin = new Vector2(0.03f, 0.06f);
         subRt.anchorMax = new Vector2(0.97f, 0.48f);
@@ -351,46 +456,464 @@ public class LevelManager : MonoBehaviour
         headerSubText.alignment = TextAlignmentOptions.Center;
         headerSubText.color = new Color(0.85f, 0.90f, 0.96f);
         headerSubText.enableAutoSizing = true;
-        headerSubText.fontSizeMin = 13f;
-        headerSubText.fontSizeMax = 21f;
+        headerSubText.fontSizeMin = 12f;
+        headerSubText.fontSizeMax = 20f;
         headerSubText.raycastTarget = false;
 
-        // Botón rápido para reiniciar el nivel en la esquina superior derecha
-        CrearBotonReiniciarUI(mainCanvas.transform);
+        // Botones superiores de navegación en partida: [☰ Menú / Niveles] y [↻ Reiniciar]
+        CrearBotonesBarraSuperior(mainCanvas.transform);
     }
 
-    private void CrearBotonReiniciarUI(Transform canvasTransform)
+    private void CrearBotonesBarraSuperior(Transform canvasTransform)
     {
-        GameObject btnObj = new GameObject("BotonReiniciarNivel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-        btnObj.transform.SetParent(canvasTransform, false);
+        topButtonsContainer = new GameObject("TopNavigationButtons", typeof(RectTransform));
+        topButtonsContainer.transform.SetParent(canvasTransform, false);
+        RectTransform containerRt = topButtonsContainer.GetComponent<RectTransform>();
+        containerRt.anchorMin = Vector2.zero;
+        containerRt.anchorMax = Vector2.one;
+        containerRt.offsetMin = Vector2.zero;
+        containerRt.offsetMax = Vector2.zero;
+
+        // Botón Menú / Selector de Niveles (centro-derecha superior)
+        CrearBotonUI(
+            topButtonsContainer.transform,
+            "BotonAbrirMenu",
+            "☰ Menú / Niveles",
+            new Vector2(0.35f, 0.925f),
+            new Vector2(0.67f, 0.98f),
+            new Color(0.16f, 0.35f, 0.55f, 0.96f),
+            MostrarMenuPrincipal
+        );
+
+        // Botón Reiniciar Nivel (derecha superior)
+        CrearBotonUI(
+            topButtonsContainer.transform,
+            "BotonReiniciarNivel",
+            "↻ Reiniciar",
+            new Vector2(0.69f, 0.925f),
+            new Vector2(0.96f, 0.98f),
+            new Color(0.22f, 0.28f, 0.38f, 0.96f),
+            ReiniciarNivelActual
+        );
+    }
+
+    // ==================== CONSTRUCCIÓN DEL MENÚ PRINCIPAL, SELECTOR Y GLOSARIO ====================
+
+    private void CrearMenuPrincipalUI()
+    {
+        if (mainMenuPanel != null) return;
+
+        Canvas mainCanvas = FindFirstObjectByType<Canvas>();
+        if (mainCanvas == null) return;
+
+        mainMenuPanel = new GameObject("MainMenuOverlay", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        mainMenuPanel.transform.SetParent(mainCanvas.transform, false);
+
+        RectTransform rootRt = mainMenuPanel.GetComponent<RectTransform>();
+        rootRt.localScale = Vector3.one;
+        rootRt.anchorMin = Vector2.zero;
+        rootRt.anchorMax = Vector2.one;
+        rootRt.offsetMin = Vector2.zero;
+        rootRt.offsetMax = Vector2.zero;
+
+        Image rootBg = mainMenuPanel.GetComponent<Image>();
+        rootBg.color = new Color(0.06f, 0.09f, 0.14f, 0.98f);
+        rootBg.raycastTarget = true;
+
+        ConstruirSubvistaHome(mainMenuPanel.transform);
+        ConstruirSubvistaSelectorNiveles(mainMenuPanel.transform);
+        ConstruirSubvistaGlosario(mainMenuPanel.transform);
+    }
+
+    private void ConstruirSubvistaHome(Transform parent)
+    {
+        mainHomeView = CrearContenedorVista(parent, "HomeView");
+
+        // Badge superior de cátedra
+        CrearTextoUI(
+            mainHomeView.transform,
+            "AcademicTag",
+            "TRABAJO FINAL INTEGRADOR • GESTIÓN DE LA ORGANIZACIÓN",
+            new Vector2(0.06f, 0.88f),
+            new Vector2(0.94f, 0.93f),
+            14f, 22f,
+            new Color(0.50f, 0.80f, 0.77f),
+            FontStyles.Bold
+        );
+
+        // Título principal
+        CrearTextoUI(
+            mainHomeView.transform,
+            "GameTitle",
+            "🏢 OrgRise",
+            new Vector2(0.06f, 0.77f),
+            new Vector2(0.94f, 0.88f),
+            40f, 76f,
+            Color.white,
+            FontStyles.Bold
+        );
+
+        // Subtítulo descriptivo
+        CrearTextoUI(
+            mainHomeView.transform,
+            "GameSubtitle",
+            "Simulador y Puzzle de Diseño de Estructuras Organizacionales\n<size=75%><color=#B0BEC5>Cadena de Mando • Tramo de Control • Departamentalización • Centralización</color></size>",
+            new Vector2(0.07f, 0.67f),
+            new Vector2(0.93f, 0.77f),
+            16f, 28f,
+            new Color(0.95f, 0.85f, 0.35f),
+            FontStyles.Normal
+        );
+
+        // Tarjeta de estado de Racha Diaria
+        GameObject streakCard = CrearPanelTarjeta(
+            mainHomeView.transform,
+            "StreakBadgeCard",
+            new Vector2(0.08f, 0.58f),
+            new Vector2(0.92f, 0.65f),
+            new Color(0.11f, 0.16f, 0.24f, 1f)
+        );
+        menuStreakBadgeText = CrearTextoUI(
+            streakCard.transform,
+            "StreakBadgeText",
+            "🔥 Racha: 0 días  |  Puzzle Diario: Disponible hoy",
+            new Vector2(0.04f, 0.1f),
+            new Vector2(0.96f, 0.9f),
+            15f, 25f,
+            Color.white,
+            FontStyles.Normal
+        );
+
+        // Botón 1: Jugar Campaña Académica (Nivel Actual)
+        CrearBotonMenuGrande(
+            mainHomeView.transform,
+            "BtnPlayCampaign",
+            "▶  MODO CAMPAÑA ACADÉMICA",
+            "Recorrido guiado por los 5 modelos de estructura organizacional",
+            new Vector2(0.08f, 0.44f),
+            new Vector2(0.92f, 0.55f),
+            new Color(0.15f, 0.52f, 0.34f, 1f),
+            () => IniciarNivelCampanaDesdeMenu(indiceNivelCampana < nivelesCampana.Length ? indiceNivelCampana : 0)
+        );
+
+        // Botón 2: Selector de Nivel (Acceso directo para la defensa oral)
+        CrearBotonMenuGrande(
+            mainHomeView.transform,
+            "BtnOpenLevelSelector",
+            "🗂️  SELECTOR DE NIVELES (5 CASOS)",
+            "Elegí directamente qué concepto o estructura demostrar",
+            new Vector2(0.08f, 0.31f),
+            new Vector2(0.92f, 0.42f),
+            new Color(0.16f, 0.38f, 0.62f, 1f),
+            () => CambiarSubvistaMenu("selector")
+        );
+
+        // Botón 3: Desafío Diario Procedural
+        CrearBotonMenuGrande(
+            mainHomeView.transform,
+            "BtnDailyChallenge",
+            "📅  DESAFÍO DIARIO PROCEDURAL",
+            "Generación algorítmica con semilla diaria y racha de victorias",
+            new Vector2(0.08f, 0.18f),
+            new Vector2(0.92f, 0.29f),
+            new Color(0.58f, 0.36f, 0.12f, 1f),
+            IniciarDesafioDiarioDesdeMenu
+        );
+
+        // Botón 4: Guía Teórica / Conceptos de la Materia
+        CrearBotonUI(
+            mainHomeView.transform,
+            "BtnGlossary",
+            "📚 Marco Teórico de Gestión de la Organización",
+            new Vector2(0.08f, 0.08f),
+            new Vector2(0.92f, 0.155f),
+            new Color(0.20f, 0.25f, 0.34f, 1f),
+            () => CambiarSubvistaMenu("glossary")
+        );
+    }
+
+    private void ConstruirSubvistaSelectorNiveles(Transform parent)
+    {
+        levelSelectorView = CrearContenedorVista(parent, "LevelSelectorView");
+
+        CrearTextoUI(
+            levelSelectorView.transform,
+            "SelectorHeader",
+            "🗂️ Selector de Casos Organizacionales",
+            new Vector2(0.06f, 0.89f),
+            new Vector2(0.94f, 0.96f),
+            24f, 42f,
+            new Color(0.96f, 0.85f, 0.35f),
+            FontStyles.Bold
+        );
+
+        CrearTextoUI(
+            levelSelectorView.transform,
+            "SelectorSub",
+            "Tocá cualquier nivel para cargarlo en el acto durante la presentación:",
+            new Vector2(0.06f, 0.84f),
+            new Vector2(0.94f, 0.89f),
+            14f, 23f,
+            new Color(0.80f, 0.86f, 0.92f),
+            FontStyles.Normal
+        );
+
+        Color[] coloresNiveles = new Color[]
+        {
+            new Color(0.15f, 0.44f, 0.32f, 1f),
+            new Color(0.16f, 0.38f, 0.58f, 1f),
+            new Color(0.48f, 0.32f, 0.14f, 1f),
+            new Color(0.38f, 0.22f, 0.52f, 1f),
+            new Color(0.14f, 0.42f, 0.48f, 1f)
+        };
+
+        float topStart = 0.82f;
+        float cardHeight = 0.115f;
+        float gap = 0.018f;
+
+        for (int i = 0; i < nivelesCampana.Length; i++)
+        {
+            int idx = i;
+            ConfiguracionNivelAcademico cfg = nivelesCampana[i];
+            float yMax = topStart - (i * (cardHeight + gap));
+            float yMin = yMax - cardHeight;
+
+            CrearBotonMenuGrande(
+                levelSelectorView.transform,
+                $"BtnSelectLevel_{i + 1}",
+                cfg.nombreCorto,
+                $"{cfg.etiquetaConcepto}  •  {cfg.cantidadNodos} Roles",
+                new Vector2(0.07f, yMin),
+                new Vector2(0.93f, yMax),
+                coloresNiveles[i % coloresNiveles.Length],
+                () => IniciarNivelCampanaDesdeMenu(idx)
+            );
+        }
+
+        // Botón Volver al Menú Principal
+        CrearBotonUI(
+            levelSelectorView.transform,
+            "BtnBackFromSelector",
+            "⬅ Volver al Menú Principal",
+            new Vector2(0.15f, 0.05f),
+            new Vector2(0.85f, 0.125f),
+            new Color(0.24f, 0.29f, 0.38f, 1f),
+            () => CambiarSubvistaMenu("home")
+        );
+    }
+
+    private void ConstruirSubvistaGlosario(Transform parent)
+    {
+        glossaryView = CrearContenedorVista(parent, "GlossaryView");
+
+        CrearTextoUI(
+            glossaryView.transform,
+            "GlossaryHeader",
+            "📚 Marco Teórico Aplicado en OrgRise",
+            new Vector2(0.06f, 0.89f),
+            new Vector2(0.94f, 0.96f),
+            24f, 40f,
+            new Color(0.96f, 0.85f, 0.35f),
+            FontStyles.Bold
+        );
+
+        GameObject card = CrearPanelTarjeta(
+            glossaryView.transform,
+            "GlossaryBodyCard",
+            new Vector2(0.06f, 0.16f),
+            new Vector2(0.94f, 0.87f),
+            new Color(0.10f, 0.14f, 0.21f, 1f)
+        );
+
+        string textoTeoria =
+            "<b>1. Cadena de Mando y Jerarquía:</b>\n" +
+            "Línea continua de autoridad que se extiende desde la cima estratégica (CEO) hasta el núcleo operativo (Analistas/Operadores), respetando el conducto regular.\n\n" +
+            "<b>2. Unidad de Mando (Fayol):</b>\n" +
+            "Cada subordinado reporta a un único jefe directo para evitar conflictos de autoridad e instrucciones contradictorias.\n\n" +
+            "<b>3. Tramo de Control (Span of Control):</b>\n" +
+            "Cantidad máxima de subordinados que un administrador puede supervisar con eficacia (indicado como <b>Tramo: X/Max</b> en cada nodo).\n\n" +
+            "<b>4. Criterios de Departamentalización:</b>\n" +
+            "• <b>Funcional:</b> Agrupamiento por especialidad (Finanzas, Comercial, Operaciones, Tecnología).\n" +
+            "• <b>Por Producto:</b> Agrupamiento por línea de negocio o servicio (PyMEs, Consumo, Industria).\n" +
+            "• <b>Geográfica:</b> Agrupamiento por territorio o zona regional (Norte, Centro, Sur).\n\n" +
+            "<b>5. Centralización vs. Descentralización:</b>\n" +
+            "Las estructuras <b>centralizadas (chatas)</b> concentran decisiones arriba con tramos amplios; las <b>descentralizadas (altas)</b> delegan autoridad táctica en mandos intermedios.";
+
+        TextMeshProUGUI txt = CrearTextoUI(
+            card.transform,
+            "GlossaryText",
+            textoTeoria,
+            new Vector2(0.05f, 0.04f),
+            new Vector2(0.95f, 0.96f),
+            13f, 24f,
+            new Color(0.92f, 0.95f, 0.98f),
+            FontStyles.Normal
+        );
+        txt.alignment = TextAlignmentOptions.MidlineLeft;
+
+        CrearBotonUI(
+            glossaryView.transform,
+            "BtnBackFromGlossary",
+            "⬅ Volver al Menú Principal",
+            new Vector2(0.15f, 0.05f),
+            new Vector2(0.85f, 0.125f),
+            new Color(0.24f, 0.29f, 0.38f, 1f),
+            () => CambiarSubvistaMenu("home")
+        );
+    }
+
+    // ==================== HELPERS DE CONSTRUCCIÓN DE UI RESPONSIVA ====================
+
+    private GameObject CrearContenedorVista(Transform parent, string nombre)
+    {
+        GameObject view = new GameObject(nombre, typeof(RectTransform));
+        view.transform.SetParent(parent, false);
+        RectTransform rt = view.GetComponent<RectTransform>();
+        rt.localScale = Vector3.one;
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        return view;
+    }
+
+    private GameObject CrearPanelTarjeta(Transform parent, string nombre, Vector2 anchorMin, Vector2 anchorMax, Color colorFondo)
+    {
+        GameObject card = new GameObject(nombre, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        card.transform.SetParent(parent, false);
+        RectTransform rt = card.GetComponent<RectTransform>();
+        rt.localScale = Vector3.one;
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = card.GetComponent<Image>();
+        img.color = colorFondo;
+        return card;
+    }
+
+    private TextMeshProUGUI CrearTextoUI(
+        Transform parent,
+        string nombre,
+        string contenido,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        float fontMin,
+        float fontMax,
+        Color colorTexto,
+        FontStyles estilo)
+    {
+        GameObject obj = new GameObject(nombre, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        obj.transform.SetParent(parent, false);
+        RectTransform rt = obj.GetComponent<RectTransform>();
+        rt.localScale = Vector3.one;
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI tmp = obj.GetComponent<TextMeshProUGUI>();
+        tmp.text = contenido;
+        tmp.color = colorTexto;
+        tmp.fontStyle = estilo;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.enableAutoSizing = true;
+        tmp.fontSizeMin = fontMin;
+        tmp.fontSizeMax = fontMax;
+        tmp.margin = Vector4.zero;
+        tmp.raycastTarget = false;
+        return tmp;
+    }
+
+    private Button CrearBotonUI(
+        Transform parent,
+        string nombre,
+        string etiqueta,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Color colorFondo,
+        UnityEngine.Events.UnityAction accion)
+    {
+        GameObject btnObj = new GameObject(nombre, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(parent, false);
 
         RectTransform rt = btnObj.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.68f, 0.925f);
-        rt.anchorMax = new Vector2(0.96f, 0.98f);
+        rt.localScale = Vector3.one;
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
 
         Image img = btnObj.GetComponent<Image>();
-        img.color = new Color(0.22f, 0.28f, 0.38f, 0.95f);
+        img.color = colorFondo;
 
         Button btn = btnObj.GetComponent<Button>();
-        btn.onClick.AddListener(ReiniciarNivelActual);
+        btn.onClick.AddListener(accion);
 
-        GameObject txtObj = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        txtObj.transform.SetParent(btnObj.transform, false);
-        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
-        txtRt.anchorMin = Vector2.zero;
-        txtRt.anchorMax = Vector2.one;
-        txtRt.offsetMin = new Vector2(8f, 4f);
-        txtRt.offsetMax = new Vector2(-8f, -4f);
+        CrearTextoUI(
+            btnObj.transform,
+            "Label",
+            etiqueta,
+            new Vector2(0.04f, 0.1f),
+            new Vector2(0.96f, 0.9f),
+            13f, 24f,
+            Color.white,
+            FontStyles.Bold
+        );
 
-        TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
-        tmp.text = "↻ Reiniciar";
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
-        tmp.enableAutoSizing = true;
-        tmp.fontSizeMin = 14f;
-        tmp.fontSizeMax = 24f;
+        return btn;
+    }
+
+    private Button CrearBotonMenuGrande(
+        Transform parent,
+        string nombre,
+        string titulo,
+        string subtitulo,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Color colorFondo,
+        UnityEngine.Events.UnityAction accion)
+    {
+        GameObject btnObj = new GameObject(nombre, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        btnObj.transform.SetParent(parent, false);
+
+        RectTransform rt = btnObj.GetComponent<RectTransform>();
+        rt.localScale = Vector3.one;
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+
+        Image img = btnObj.GetComponent<Image>();
+        img.color = colorFondo;
+
+        Button btn = btnObj.GetComponent<Button>();
+        btn.onClick.AddListener(accion);
+
+        CrearTextoUI(
+            btnObj.transform,
+            "Title",
+            titulo,
+            new Vector2(0.04f, 0.45f),
+            new Vector2(0.96f, 0.92f),
+            16f, 28f,
+            Color.white,
+            FontStyles.Bold
+        );
+
+        CrearTextoUI(
+            btnObj.transform,
+            "Subtitle",
+            subtitulo,
+            new Vector2(0.04f, 0.08f),
+            new Vector2(0.96f, 0.45f),
+            12f, 20f,
+            new Color(0.90f, 0.94f, 0.98f),
+            FontStyles.Normal
+        );
+
+        return btn;
     }
 
     private void ActualizarCabeceraUI(string titulo, string subtitulo)
