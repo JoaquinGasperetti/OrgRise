@@ -1,8 +1,9 @@
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(EmployeeNode))]
-public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
+public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler, IPointerClickHandler
 {
     private EmployeeNode myNode;
     private RectTransform myRect;
@@ -21,17 +22,65 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
         canvas = GetComponentInParent<Canvas>();
     }
 
-    public void OnBeginDrag(PointerEventData eventData)
+    public void OnPointerClick(PointerEventData eventData)
     {
-        // RESTRICCIÓN: Si tiene subordinados y no está usando el comodín, bloqueamos el arrastre.
-        if (myNode.directReports.Count > 0 && !WildcardManager.Instance.comodinActivo)
+        // Doble clic / doble toque o clic derecho para desconectar al subordinado de su jefe actual
+        if (eventData.button == PointerEventData.InputButton.Right || eventData.clickCount >= 2)
         {
-            Debug.LogWarning("No puedes mover una rama entera sin un Comodín de Reestructuración.");
-            eventData.pointerDrag = null; // Cancela el evento de arrastre de uGUI
+            TryDisconnectFromManager();
+        }
+    }
+
+    public void TryDisconnectFromManager()
+    {
+        if (myNode == null || myNode.manager == null) return;
+
+        bool tieneSubordinados = myNode.directReports.Count > 0;
+        bool comodinListo = WildcardManager.Instance != null && WildcardManager.Instance.comodinActivo;
+
+        if (tieneSubordinados && !comodinListo)
+        {
+            if (FeedbackManager.Instance != null)
+            {
+                FeedbackManager.Instance.PlayErrorFeedback(myNode, "Reestructuración bloqueada: este mando ya tiene subordinados a cargo. Activá el Comodín para mover o desconectar toda la rama.");
+            }
             return;
         }
 
-        GameObject lineObj = Instantiate(linePrefab, canvas.transform);
+        string exJefe = myNode.manager.roleName;
+        myNode.RemoveCurrentManager();
+
+        if (currentManagerLine != null)
+        {
+            Destroy(currentManagerLine);
+            currentManagerLine = null;
+        }
+
+        if (tieneSubordinados && comodinListo && WildcardManager.Instance != null)
+        {
+            WildcardManager.Instance.ConsumirComodin();
+        }
+
+        if (FeedbackManager.Instance != null)
+        {
+            FeedbackManager.Instance.PlaySnapFeedback(transform, $"Desconectado: {myNode.roleName} dejó de reportar a {exJefe}.");
+        }
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (canvas == null) canvas = GetComponentInParent<Canvas>();
+        if (linePrefab == null || canvas == null) return;
+
+        Transform lineParent = transform.parent != null ? transform.parent : canvas.transform;
+        GameObject lineObj = Instantiate(linePrefab, lineParent);
+        Image lineImg = lineObj.GetComponent<Image>();
+        if (lineImg != null)
+        {
+            lineImg.raycastTarget = false;
+            lineImg.color = new Color(0.2f, 0.25f, 0.35f, 0.85f);
+        }
+
         tempLine = lineObj.GetComponent<RectTransform>();
         tempLine.SetAsFirstSibling();
 
@@ -40,13 +89,11 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnDrag(PointerEventData eventData)
     {
-        // Actualizar la línea mientras movemos el cursor
         UpdateLineVisuals(eventData.position);
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        // Destruir la línea temporal al soltar
         if (tempLine != null)
         {
             Destroy(tempLine.gameObject);
@@ -55,56 +102,117 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnDrop(PointerEventData eventData)
     {
-        UINodeInteraction droppedNodeUI = eventData.pointerDrag?.GetComponent<UINodeInteraction>();
+        if (eventData.pointerDrag == null) return;
 
-        if (droppedNodeUI != null && droppedNodeUI != this)
+        UINodeInteraction draggedNodeUI = eventData.pointerDrag.GetComponent<UINodeInteraction>();
+        if (draggedNodeUI == null || draggedNodeUI == this) return;
+
+        EmployeeNode nodeA = draggedNodeUI.myNode;
+        EmployeeNode nodeB = this.myNode;
+
+        if (nodeA == null || nodeB == null) return;
+
+        // Determinamos automáticamente quién es el subordinado y quién es el superior según su nivel jerárquico
+        // para que el jugador pueda arrastrar tanto de subordinado->jefe como de jefe->subordinado
+        EmployeeNode subordinateNode = nodeA;
+        EmployeeNode managerNode = nodeB;
+        UINodeInteraction subordinateUI = draggedNodeUI;
+        UINodeInteraction managerUI = this;
+
+        if (nodeA.nivel < nodeB.nivel)
         {
-            EmployeeNode subordinateNode = droppedNodeUI.GetComponent<EmployeeNode>();
+            subordinateNode = nodeB;
+            managerNode = nodeA;
+            subordinateUI = this;
+            managerUI = draggedNodeUI;
+        }
 
-            if (subordinateNode.TryAssignManager(myNode))
+        // Restricción de reestructuración: si el subordinado que cambia de jefe ya tiene gente a cargo y ya tenía un jefe asignado (o se mueve en bloque)
+        bool requiereComodin = subordinateNode.directReports.Count > 0 && subordinateNode.manager != null;
+        bool comodinActivo = WildcardManager.Instance != null && WildcardManager.Instance.comodinActivo;
+
+        if (requiereComodin && !comodinActivo)
+        {
+            if (FeedbackManager.Instance != null)
             {
-                if (droppedNodeUI.currentManagerLine != null) Destroy(droppedNodeUI.currentManagerLine);
+                FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, "No podés reasignar una rama con subordinados sin activar el Comodín de Reestructuración.");
+            }
+            return;
+        }
 
-                GameObject permLine = Instantiate(linePrefab, canvas.transform);
-                permLine.transform.SetAsFirstSibling();
+        if (subordinateNode.TryAssignManager(managerNode, out string motivoRechazo))
+        {
+            if (subordinateUI.currentManagerLine != null)
+            {
+                Destroy(subordinateUI.currentManagerLine);
+            }
 
-                UILineConnection lineLogic = permLine.AddComponent<UILineConnection>();
-                lineLogic.startNode = myRect;
-                lineLogic.endNode = droppedNodeUI.GetComponent<RectTransform>();
+            Transform lineParent = transform.parent != null ? transform.parent : canvas.transform;
+            GameObject permLine = Instantiate(linePrefab, lineParent);
+            permLine.transform.SetAsFirstSibling();
 
-                droppedNodeUI.currentManagerLine = permLine;
+            UILineConnection lineLogic = permLine.GetComponent<UILineConnection>();
+            if (lineLogic == null) lineLogic = permLine.AddComponent<UILineConnection>();
 
-                // CONSUMIR EL COMODÍN si el nodo movido tenía una rama colgada
-                if (subordinateNode.directReports.Count > 0 && WildcardManager.Instance.comodinActivo)
-                {
-                    WildcardManager.Instance.ConsumirComodin();
-                }
+            lineLogic.startNode = managerUI.myRect;
+            lineLogic.endNode = subordinateUI.myRect;
+            lineLogic.SetLineColor(new Color(0.18f, 0.32f, 0.48f, 0.95f));
+            lineLogic.UpdateGeometry(managerUI.myRect.position, subordinateUI.myRect.position);
 
+            subordinateUI.currentManagerLine = permLine;
+
+            // Consumir comodín si se reestructuró una rama activa
+            if (subordinateNode.directReports.Count > 0 && comodinActivo && WildcardManager.Instance != null)
+            {
+                WildcardManager.Instance.ConsumirComodin();
+            }
+
+            if (FeedbackManager.Instance != null)
+            {
+                FeedbackManager.Instance.PlaySnapFeedback(
+                    managerUI.transform,
+                    $"✓ Cadena de mando: {subordinateNode.roleName} → {managerNode.roleName} (Tramo: {managerNode.directReports.Count}/{managerNode.maxDirectReports})"
+                );
+            }
+
+            if (TutorialManager.Instance != null)
+            {
+                TutorialManager.Instance.NotificarConexionExitosa();
+            }
+
+            if (LevelManager.Instance != null)
+            {
                 LevelManager.Instance.EvaluarVictoria();
             }
         }
-
-        // Dentro de OnDrop, después de: droppedNodeUI.currentManagerLine = permLine;
-
-        if (TutorialManager.Instance != null)
+        else
         {
-            TutorialManager.Instance.NotificarConexionExitosa();
+            if (FeedbackManager.Instance != null)
+            {
+                FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, motivoRechazo);
+            }
         }
     }
 
-    private void UpdateLineVisuals(Vector2 targetPosition)
+    private void UpdateLineVisuals(Vector2 screenPointerPos)
     {
-        if (tempLine == null) return;
+        if (tempLine == null || myRect == null) return;
 
-        // Calcular distancia y ángulo desde este nodo hasta el mouse
-        Vector2 startPos = myRect.position;
-        Vector2 dir = targetPosition - startPos;
-        float distance = dir.magnitude;
-        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        tempLine.pivot = new Vector2(0f, 0.5f);
+        tempLine.position = myRect.position;
 
-        // Posicionar, rotar y estirar la línea
-        tempLine.position = startPos;
-        tempLine.rotation = Quaternion.Euler(0, 0, angle);
-        tempLine.sizeDelta = new Vector2(distance, 10f); // 10f es el grosor de la línea
+        RectTransform parentRect = tempLine.parent as RectTransform;
+        Camera cam = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay) ? canvas.worldCamera : null;
+
+        if (parentRect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, screenPointerPos, cam, out Vector2 localPointerPos))
+        {
+            Vector2 localStart = parentRect.InverseTransformPoint(myRect.position);
+            Vector2 dir = localPointerPos - localStart;
+            float distance = dir.magnitude;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+            tempLine.localRotation = Quaternion.Euler(0f, 0f, angle);
+            tempLine.sizeDelta = new Vector2(distance, 8f);
+        }
     }
 }

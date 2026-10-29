@@ -1,7 +1,6 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using System.Collections;
 
 public class TutorialManager : MonoBehaviour
 {
@@ -10,19 +9,19 @@ public class TutorialManager : MonoBehaviour
     [Header("Referencias UI")]
     public GameObject tutorialPanel;
     public TextMeshProUGUI tutorialText;
-    public Button botonContinuar; // Opcional, para pasos que solo son de lectura
+    public Button botonContinuar;
 
     private int pasoActual = 0;
     private bool tutorialActivo = false;
+    private bool enPantallaVictoria = false;
+    private bool tutorialYaMostradoEnSesion = false;
 
-    // Los textos del tutorial
-    private string[] instrucciones = new string[]
+    private readonly string[] instrucciones = new string[]
     {
-        "¡Bienvenido a la empresa! Tu objetivo es armar el organigrama perfecto.",
-        "Mecánica base: Arrastrá una línea desde el <b>Analista</b> hasta el <b>CEO</b> para establecer la cadena de mando.",
-        "¡Excelente! Pero cuidado: los jefes tienen un <b>límite de reportes</b> (Tramo de control).",
-        "Por último, respetá las áreas. Los nodos <b>Verdes (Finanzas)</b> solo pueden reportar a jefes de Finanzas o al CEO.",
-        "¡Todo listo! Resolvé este puzzle para empezar a trabajar."
+        "<b>🏢 Bienvenido a OrgRise</b>\n\nTu objetivo es diseñar estructuras organizacionales eficientes aplicando los principios de <b>Gestión de la Organización</b>.",
+        "<b>1. Cadena y Unidad de Mando</b>\n\nArrastrá una línea entre un subordinado y su jefe inmediato (Gerente → Director → CEO). Ahora hacé tu primera conexión válida en el tablero.",
+        "<b>2. Tramo de Control (Span of Control)</b>\n\n¡Bien hecho! Cada superior tiene un límite máximo de reportes directos (<b>Tramo: X/Max</b>). Si lo superás, se produce un cuello de botella.",
+        "<b>3. Departamentalización y Reestructuración</b>\n\nRespetá el color/área de cada unidad. Podés hacer <b>doble clic</b> sobre un nodo para desconectarlo, o usar el <b>Comodín</b> para mover una rama completa.\n\n¡Completá el organigrama!"
     };
 
     void Awake()
@@ -33,14 +32,57 @@ public class TutorialManager : MonoBehaviour
 
     void Start()
     {
-        botonContinuar.onClick.AddListener(AvanzarPasoLectura);
+        ConfigurarEsteticaPanel();
+
+        if (botonContinuar != null)
+        {
+            botonContinuar.onClick.RemoveAllListeners();
+            botonContinuar.onClick.AddListener(AlPresionarBotonPrincipal);
+        }
+
+        // Si LevelManager aún no llamó a IniciarTutorial, lo iniciamos automáticamente
+        if (!tutorialActivo && !enPantallaVictoria && !tutorialYaMostradoEnSesion)
+        {
+            IniciarTutorial();
+        }
+    }
+
+    private void ConfigurarEsteticaPanel()
+    {
+        if (tutorialText != null)
+        {
+            tutorialText.enableAutoSizing = true;
+            tutorialText.fontSizeMin = 18f;
+            tutorialText.fontSizeMax = 30f;
+            tutorialText.alignment = TextAlignmentOptions.Center;
+        }
+
+        // Permitimos que el fondo oscuro no bloquee el arrastre de los nodos cuando estamos en el paso práctico
+        if (tutorialPanel != null)
+        {
+            Image panelImg = tutorialPanel.GetComponent<Image>();
+            if (panelImg != null)
+            {
+                panelImg.raycastTarget = false;
+            }
+        }
     }
 
     public void IniciarTutorial()
     {
+        if (tutorialYaMostradoEnSesion)
+        {
+            if (tutorialPanel != null) tutorialPanel.SetActive(false);
+            return;
+        }
+
+        tutorialYaMostradoEnSesion = true;
+        enPantallaVictoria = false;
         tutorialActivo = true;
         pasoActual = 0;
-        tutorialPanel.SetActive(true);
+
+        if (tutorialPanel != null) tutorialPanel.SetActive(true);
+        ActualizarTextoBoton("Continuar");
         MostrarPaso(pasoActual);
     }
 
@@ -52,24 +94,45 @@ public class TutorialManager : MonoBehaviour
             return;
         }
 
-        tutorialText.text = instrucciones[indice];
+        if (tutorialText != null)
+        {
+            tutorialText.text = instrucciones[indice];
+        }
 
-        // Lógica de qué pasos requieren botón y cuáles requieren que el jugador juegue
-        if (indice == 1)
+        if (botonContinuar != null)
         {
-            // El paso 1 requiere arrastrar la línea, ocultamos el botón de continuar
-            botonContinuar.gameObject.SetActive(false);
-        }
-        else
-        {
-            // Los demás son informativos, mostramos el botón
+            // En el paso 1 invitamos a conectar un nodo, pero también dejamos el botón como "Entendido / Saltar"
+            // para que nunca se bloquee la partida si el usuario prefiere cerrar el cartel primero
             botonContinuar.gameObject.SetActive(true);
+            ActualizarTextoBoton(indice == instrucciones.Length - 1 ? "¡Empezar!" : "Continuar");
         }
+    }
+
+    private void AlPresionarBotonPrincipal()
+    {
+        if (enPantallaVictoria)
+        {
+            enPantallaVictoria = false;
+            if (tutorialPanel != null) tutorialPanel.SetActive(false);
+
+            if (LevelManager.Instance != null)
+            {
+                LevelManager.Instance.AvanzarSiguienteNivel();
+            }
+            return;
+        }
+
+        AvanzarPasoLectura();
     }
 
     public void AvanzarPasoLectura()
     {
-        if (!tutorialActivo) return;
+        if (!tutorialActivo)
+        {
+            if (tutorialPanel != null) tutorialPanel.SetActive(false);
+            return;
+        }
+
         pasoActual++;
         MostrarPaso(pasoActual);
     }
@@ -81,7 +144,6 @@ public class TutorialManager : MonoBehaviour
     {
         if (tutorialActivo && pasoActual == 1)
         {
-            // El jugador cumplió la tarea práctica, avanzamos
             pasoActual++;
             MostrarPaso(pasoActual);
         }
@@ -90,6 +152,42 @@ public class TutorialManager : MonoBehaviour
     private void FinalizarTutorial()
     {
         tutorialActivo = false;
-        tutorialPanel.SetActive(false);
+        if (tutorialPanel != null) tutorialPanel.SetActive(false);
+    }
+
+    /// <summary>
+    /// Muestra el resumen académico al completar un nivel y permite avanzar al siguiente desafío.
+    /// </summary>
+    public void MostrarPantallaNivelCompletado(string resumenAcademico)
+    {
+        tutorialActivo = false;
+        enPantallaVictoria = true;
+
+        if (tutorialPanel != null)
+        {
+            tutorialPanel.SetActive(true);
+            tutorialPanel.transform.SetAsLastSibling();
+        }
+
+        if (tutorialText != null)
+        {
+            tutorialText.text = $"<color=#69F0AE><b>¡ORGANIGRAMA VALIDADO!</b></color>\n\n{resumenAcademico}";
+        }
+
+        if (botonContinuar != null)
+        {
+            botonContinuar.gameObject.SetActive(true);
+            ActualizarTextoBoton("Siguiente Nivel ➔");
+        }
+    }
+
+    private void ActualizarTextoBoton(string texto)
+    {
+        if (botonContinuar == null) return;
+        TextMeshProUGUI btnTxt = botonContinuar.GetComponentInChildren<TextMeshProUGUI>();
+        if (btnTxt != null)
+        {
+            btnTxt.text = texto;
+        }
     }
 }

@@ -19,7 +19,7 @@ public class StreakUI : MonoBehaviour
 
     public void ActualizarPantalla()
     {
-        if (DailyStreakManager.Instance != null)
+        if (DailyStreakManager.Instance != null && textoRacha != null)
         {
             int racha = DailyStreakManager.Instance.currentStreak;
             textoRacha.text = $"🔥 {racha}";

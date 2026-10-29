@@ -1,35 +1,50 @@
-# 🏢 OrgRise - Puzzle de Organigramas
+# 🏢 OrgRise - Puzzle de Diseño Organizacional
 
 ## 📌 Resumen del Proyecto
-OrgRise es un juego de puzzles para móviles donde el jugador debe armar organigramas funcionales conectando diferentes roles bajo restricciones específicas de gestión. 
+**OrgRise** es un juego de puzzles en 2D para dispositivos móviles desarrollado en **Unity 6 (`6000.3.10f1`)** donde el jugador debe diseñar organigramas funcionales conectando distintos roles empresariales bajo restricciones reales de gestión.
 
-Este proyecto tiene un doble propósito: funciona como el trabajo final integrador para la materia **Gestión de la Organización** y, al mismo tiempo, está diseñado como un producto viable para la Play Store con un fuerte enfoque en el contenido visual "satisfying" para redes sociales.
+Este proyecto funciona como **Trabajo Final Integrador para la materia Gestión de la Organización**, traduciendo conceptos clásicos de diseño estructural (Mintzberg, Fayol, Robbins) en mecánicas interactivas con validación en tiempo real.
 
-## 🎮 Mecánicas Principales y Loop de Juego
-El jugador recibe un conjunto de "empleados" (nodos) y un objetivo estructural para armar la jerarquía.
-* **Conexión de nodos:** Se trazan líneas de reporte directo entre un superior y sus subordinados.
-* **Validación en tiempo real:** El sistema resalta errores como cuellos de botella, ciclos cerrados o excesos en el tramo de control.
-* **Feedback "Satisfying":** Al resolver el organigrama correctamente, se activa una animación de encastre con un sonido satisfactorio, haciendo que la estructura cobre vida.
-* **Departamentalización:** Cada "mundo" o paquete de niveles cambia las reglas de agrupamiento (funcional, por producto, geográfica) a modo de skins mecánicos.
+---
+
+## 📚 Articulación Teórico-Práctica (Gestión de la Organización)
+
+Cada regla de validación del motor de juego responde directamente a un principio de la asignatura:
+
+| Concepto Académico | Implementación en el Juego (Mecánica) | Script Responsable |
+| :--- | :--- | :--- |
+| **Cadena de Mando y Jerarquía** | Los reportes solo pueden fluir desde el Nivel Operativo (`EmpleadoBase`) hacia el Nivel Táctico (`Gerente`), Nivel Ejecutivo (`Director`) y Nivel Estratégico (`CEO`), respetando el conducto regular. | `EmployeeNode.cs`, `OrgValidator.cs` |
+| **Unidad de Mando** | Cada subordinado posee un único jefe directo (`manager`) a la vez, evitando la dualidad de mando (salvo coordinación transversal en el modo Matricial). | `EmployeeNode.cs` |
+| **Tramo de Control (*Span of Control*)** | Cada mando posee un límite estricto de reportes directos (`Tramo: X/Max`). Al completarse el cupo, el indicador cambia de verde a rojo e impide la sobrecarga de supervisión (cuellos de botella). | `EmployeeNode.cs`, `ProceduralLevelGenerator.cs` |
+| **Departamentalización** | Los niveles cambian dinámicamente el criterio de agrupamiento de las unidades: **Funcional** (Finanzas, Comercial, Operaciones, Tecnología), **Por Producto** (PyMEs, Consumo, Industria, Cloud), **Geográfica** (Regiones Norte, Centro, Sur, Exterior) y **Matricial** (Proyectos). | `LevelManager.cs`, `ProceduralLevelGenerator.cs` |
+| **Centralización vs. Descentralización** | **Estructura Centralizada (Chata):** Tramo de control amplio en la cúpula y menos niveles intermedios.<br>**Estructura Descentralizada (Vertical):** Tramo de control estrecho que obliga al CEO a delegar autoridad en Directores y Gerentes. | `LevelManager.cs`, `ProceduralLevelGenerator.cs` |
+| **Costo de Reestructuración** | Cuando un mando medio ya tiene personal a cargo, su rama queda consolidada. Para reasignar toda la unidad sin desarmarla se requiere un **Comodín de Reestructuración** (Consultoría Organizacional). | `WildcardManager.cs`, `UINodeInteraction.cs` |
+
+---
+
+## 🎮 Flujo de Niveles de la Entrega Académica
+
+El juego incluye una campaña progresiva de **5 niveles demostrativos** seguida de un **Modo Desafío Diario Procedural**:
+
+1. **Nivel 1 — Cadena de Mando y Tramo de Control:** Introducción a la estructura jerárquica lineal-funcional.
+2. **Nivel 2 — Departamentalización por Producto:** Agrupamiento divisional por líneas de negocio.
+3. **Nivel 3 — Departamentalización Geográfica:** Organización territorial por zonas.
+4. **Nivel 4 — Estructura Centralizada (Horizontal / Chata):** Tramo de control amplio y supervisión directa desde la cúpula.
+5. **Nivel 5 — Estructura Descentralizada (Vertical / Alta):** Tramo de control estrecho con delegación táctica obligatoria.
+6. **Modo Desafío Diario Infinito:** Generación procedural con semilla determinista diaria (`yyyyMMdd`) y solubilidad matemática 100% garantizada.
+
+---
+
+## 🕹️ Controles e Interacción
+
+* **Conectar roles:** Arrastrar desde un subordinado hacia su superior (o desde el superior hacia el subordinado).
+* **Desconectar un rol:** Hacer **doble clic / doble toque** (o clic derecho en PC) sobre el nodo subordinado.
+* **Comodín de Reestructuración:** Presionar el botón **Comodín** para habilitar el traslado o desconexión de un mando que ya tiene subordinados a cargo.
+* **Feedback Teórico en Tiempo Real:** Cada conexión válida o rechazada muestra en la parte inferior la justificación teórica exacta (ej. *Tramo de control excedido*, *Incompatibilidad de departamentalización* o *Salto en la cadena de mando*).
+
+---
 
 ## ⚙️ Especificaciones Técnicas
-* **Motor:** Unity 6000.3.10f1.
-* **Entorno:** 2D, utilizando uGUI para la interfaz.
-* **Plataforma Objetivo:** Android (Google Play) en orientación vertical.
-* **Persistencia de Datos:** Guardado local de progreso del jugador y rachas de conexión.
-* **Estructura de Niveles:** Definidos mediante ScriptableObjects y JSON para permitir la generación de puzzles diarios de forma procedimental.
-
-## 📚 Justificación Académica (Gestión de la Organización)
-El diseño del juego traduce directamente la teoría a mecánicas jugables:
-* **Cadena de mando** = Mecánica base de conexión jerárquica padre-hijo.
-* **Tramo de control** = Restricción numérica de reportes directos permitidos por nodo.
-* **Departamentalización** = "Skins" de reglas distintas según el mundo o nivel.
-* **Centralización vs. Descentralización** = Puzzles que obligan a distribuir la autoridad en lugar de concentrarla en un solo nodo.
-
-## 🚀 Roadmap / Próximos Pasos (To-Do)
-- [ ] Desarrollar el prototipo jugable de las mecánicas base (conexión, tramo de control y validación.
-- [ ] Realizar playtesting interno y ajustar la curva de dificultad.
-- [ ] Implementar el sistema de racha y el generador de puzzle diario.
-- [ ] Integrar monetización: AdMob (video recompensado) y compras in-app (IAP) cosméticas.
-- [ ] Pulir el arte final de los 4 skins temáticos (Startup, Corporación, Gobierno, ONG).
-- [ ] Grabar clips de 15-20 segundos del gameplay final para la campaña en redes.
+* **Motor:** Unity `6000.3.10f1` (Universal Render Pipeline 2D).
+* **Interfaz:** Unity uGUI + TextMeshPro con escalado automático (`1080x1920` Portrait).
+* **Persistencia:** Sistema de racha diaria con `PlayerPrefs` e `InvariantCulture` (`yyyy-MM-dd`).

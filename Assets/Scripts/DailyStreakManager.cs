@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Globalization;
 
 public class DailyStreakManager : MonoBehaviour
 {
@@ -7,6 +8,7 @@ public class DailyStreakManager : MonoBehaviour
 
     private string lastPlayDateKey = "LastPlayDate";
     private string currentStreakKey = "CurrentStreak";
+    private const string DateFormat = "yyyy-MM-dd";
 
     [HideInInspector] public int currentStreak;
     [HideInInspector] public bool alreadyPlayedToday;
@@ -26,24 +28,35 @@ public class DailyStreakManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(lastDateStr))
         {
-            DateTime lastDate = DateTime.Parse(lastDateStr);
-            DateTime today = DateTime.Today;
-
-            TimeSpan difference = today - lastDate.Date;
-
-            if (difference.Days == 0)
+            if (!DateTime.TryParseExact(lastDateStr, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime lastDate))
             {
-                alreadyPlayedToday = true;
+                DateTime.TryParse(lastDateStr, out lastDate);
             }
-            else if (difference.Days == 1)
+
+            if (lastDate != default)
             {
-                alreadyPlayedToday = false; // Está en racha, pero aún no jugó hoy
+                DateTime today = DateTime.Today;
+                TimeSpan difference = today - lastDate.Date;
+
+                if (difference.Days == 0)
+                {
+                    alreadyPlayedToday = true;
+                }
+                else if (difference.Days == 1)
+                {
+                    alreadyPlayedToday = false; // Está en racha, pero aún no jugó hoy
+                }
+                else if (difference.Days > 1)
+                {
+                    currentStreak = 0; // Perdió la racha
+                    alreadyPlayedToday = false;
+                    PlayerPrefs.SetInt(currentStreakKey, currentStreak);
+                    PlayerPrefs.Save();
+                }
             }
-            else if (difference.Days > 1)
+            else
             {
-                currentStreak = 0; // Perdió la racha
                 alreadyPlayedToday = false;
-                PlayerPrefs.SetInt(currentStreakKey, currentStreak);
             }
         }
         else
@@ -53,7 +66,7 @@ public class DailyStreakManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Se llama cuando el jugador resuelve el puzzle diario correctamente.
+    /// Se llama cuando el jugador resuelve el puzzle correctamente.
     /// </summary>
     public void RegisterWin()
     {
@@ -61,7 +74,7 @@ public class DailyStreakManager : MonoBehaviour
         {
             currentStreak++;
             PlayerPrefs.SetInt(currentStreakKey, currentStreak);
-            PlayerPrefs.SetString(lastPlayDateKey, DateTime.Today.ToString());
+            PlayerPrefs.SetString(lastPlayDateKey, DateTime.Today.ToString(DateFormat, CultureInfo.InvariantCulture));
             PlayerPrefs.Save();
 
             alreadyPlayedToday = true;
