@@ -137,6 +137,23 @@ public class LevelManager : MonoBehaviour
         MostrarMenuPrincipalInterno();
     }
 
+    public void RefrescarLayoutResponsivo()
+    {
+        NormalizarLayoutVerticalMovil();
+        if (mainMenuPanel != null)
+        {
+            RectTransform rootRt = mainMenuPanel.GetComponent<RectTransform>();
+            if (rootRt != null)
+            {
+                float bottomSafe = AdMobManager.Instance != null ? AdMobManager.Instance.ObtenerAlturaRelativaZonaSeguraBanner() : 0.068f;
+                rootRt.anchorMin = new Vector2(0f, bottomSafe);
+                rootRt.anchorMax = new Vector2(1f, 1f);
+                rootRt.offsetMin = Vector2.zero;
+                rootRt.offsetMax = Vector2.zero;
+            }
+        }
+    }
+
     private void NormalizarLayoutVerticalMovil()
     {
         Canvas mainCanvas = FindFirstObjectByType<Canvas>();

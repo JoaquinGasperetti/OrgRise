@@ -8,12 +8,12 @@ using GoogleMobileAds.Common;
 
 /// <summary>
 /// Gestor centralizado de Google AdMob (Google Mobile Ads Unity Plugin v11.6.0).
-/// Implementa los 5 formatos de la cuenta respetando estrictamente las políticas oficiales de Google AdMob:
-/// 1. Banner (fijo en el borde inferior con franja de seguridad libre de controles interactivos).
-/// 2. Carga de aplicación / App Open (al abrir la app y al volver desde segundo plano, con expiración de 4h y cooldown).
-/// 3. Intersticial (pre-cargado, solo en transiciones naturales, máximo 1 cada 2 acciones de usuario y cooldown mínimo).
-/// 4. Intersticial Bonificado (en transiciones de fin de nivel, con pantalla introductoria obligatoria y opción "No, gracias").
-/// 5. Bonificado / Rewarded (100% voluntario mediante botones con divulgación explícita de la recompensa).
+/// Incluye adaptación responsiva automática para todas las resoluciones y relaciones de aspecto
+/// (16:9, 18:9, 19.5:9, 20:9, 4:3 tablets y ventana libre del Editor):
+/// - Usa Anchored Adaptive Banner (FullWidth) para que el banner se ajuste al 100% del ancho de cualquier pantalla.
+/// - Reajusta dinámicamente los Canvas de anuncios (tanto en dispositivo como los PlaceholderAds del Editor)
+///   para evitar que los anuncios de pantalla completa, el botón "Close Ad", el contador o el banner se corten o desborden.
+/// - Recalcula automáticamente los anuncios si cambia la resolución o el aspecto de la pantalla en tiempo real.
 /// </summary>
 public class AdMobManager : MonoBehaviour
 {
@@ -57,6 +57,11 @@ public class AdMobManager : MonoBehaviour
     private int contadorAccionesTransicion = 0;
     private int contadorNivelesCompletados = 0;
 
+    // Seguimiento de resolución para recalcular anuncios si cambia el tamaño/aspecto de pantalla
+    private int ultimoAnchoPantalla = 0;
+    private int ultimoAltoPantalla = 0;
+    private float alturaRelativaBannerActual = 0.068f;
+
     // UI de franja segura para el Banner y Modal Introductorio de Intersticial Bonificado
     private GameObject bannerSafeZoneBar;
     private GameObject rewardedInterstitialPromptPanel;
@@ -99,6 +104,9 @@ public class AdMobManager : MonoBehaviour
 
     void Start()
     {
+        ultimoAnchoPantalla = Screen.width;
+        ultimoAltoPantalla = Screen.height;
+
         CrearFranjaSeguraBannerUI();
 
         // Asegurar que todos los callbacks del SDK de AdMob se ejecuten en el hilo principal de Unity
@@ -121,6 +129,34 @@ public class AdMobManager : MonoBehaviour
         });
     }
 
+    void Update()
+    {
+        // Si cambia la resolución o relación de aspecto (por ejemplo al cambiar de dispositivo en el simulador de Unity o rotar),
+        // reajustamos automáticamente el Banner adaptativo y cualquier anuncio activo en pantalla.
+        if (Screen.width != ultimoAnchoPantalla || Screen.height != ultimoAltoPantalla)
+        {
+            ultimoAnchoPantalla = Screen.width;
+            ultimoAltoPantalla = Screen.height;
+
+            if (sdkInicializado)
+            {
+                CargarYMostrarBanner();
+                AjustarCanvasesDeAnunciosEnPantalla();
+            }
+
+            if (LevelManager.Instance != null)
+            {
+                LevelManager.Instance.RefrescarLayoutResponsivo();
+            }
+        }
+
+        // Mantener normalizados los Canvas de anuncios cuando hay uno visible en el Editor
+        if (anuncioPantallaCompletaActivo || bannerVisible)
+        {
+            AjustarCanvasesDeAnunciosEnPantalla();
+        }
+    }
+
     void OnDestroy()
     {
         if (Instance == this)
@@ -135,9 +171,239 @@ public class AdMobManager : MonoBehaviour
     }
 
     // =========================================================================
-    // 1. BANNER (ca-app-pub-2266949018056491/9799830280)
-    // Política AdMob: 1 solo banner fijo en el borde inferior, sin superponerse
-    // con botones ni contenido interactivo.
+    // NORMALIZADOR RESPONSIVO DE ANUNCIOS PARA TODAS LAS PANTALLAS
+    // Corrige el escalado tanto en dispositivos de distinto aspecto (16:9, 20:9,
+    // 4:3 tablets) como en los prefabs PlaceholderAds del Editor de Unity.
+    // =========================================================================
+
+    public void AjustarCanvasesDeAnunciosEnPantalla()
+    {
+        Canvas[] todosLosCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        foreach (Canvas c in todosLosCanvases)
+        {
+            if (c == null || c.gameObject == null) continue;
+            string nombre = c.gameObject.name;
+
+            // 1. Ajuste responsivo del Banner (ADAPTIVE, BANNER, SMART_BANNER)
+            if (nombre.StartsWith("ADAPTIVE") || nombre.StartsWith("BANNER") || nombre.StartsWith("SMART_BANNER") || nombre.StartsWith("LARGE_BANNER") || nombre.StartsWith("FULL_BANNER"))
+            {
+                NormalizarCanvasBanner(c);
+            }
+            // 2. Ajuste responsivo de anuncios de pantalla completa (Intersticial, AppOpen, Bonificado, Intersticial Bonificado)
+            else if (nombre.StartsWith("768x1024") || nombre.StartsWith("1024x768"))
+            {
+                NormalizarCanvasPantallaCompleta(c);
+            }
+        }
+    }
+
+    private void NormalizarCanvasBanner(Canvas bannerCanvas)
+    {
+        bannerCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        bannerCanvas.overrideSorting = true;
+        bannerCanvas.sortingOrder = 500;
+
+        CanvasScaler scaler = bannerCanvas.GetComponent<CanvasScaler>();
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        // Buscar el objeto hijo "Image" que representa el contenedor del banner
+        Transform imgTransform = bannerCanvas.transform.Find("Image");
+        if (imgTransform == null && bannerCanvas.transform.childCount > 0)
+        {
+            imgTransform = bannerCanvas.transform.GetChild(0);
+        }
+
+        if (imgTransform != null)
+        {
+            RectTransform rt = imgTransform.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                // Respetar SafeArea inferior del teléfono (barra gestual en iOS/Android modernos)
+                float safeBottomRatio = Screen.height > 0 ? Mathf.Clamp01(Screen.safeArea.yMin / Screen.height) : 0f;
+                float bannerHeightRatio = 0.062f;
+                alturaRelativaBannerActual = Mathf.Clamp(safeBottomRatio + bannerHeightRatio, 0.065f, 0.10f);
+
+                rt.localScale = Vector3.one;
+                rt.anchorMin = new Vector2(0f, safeBottomRatio);
+                rt.anchorMax = new Vector2(1f, alturaRelativaBannerActual);
+                rt.pivot = new Vector2(0.5f, 0f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = Vector2.zero;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+            }
+
+            Image img = imgTransform.GetComponent<Image>();
+            if (img != null)
+            {
+                img.preserveAspect = false;
+            }
+
+            // Ajustar el texto interno si existe ("This is a Test Adaptive Banner")
+            Text legacyText = imgTransform.GetComponentInChildren<Text>(true);
+            if (legacyText != null)
+            {
+                RectTransform txtRt = legacyText.GetComponent<RectTransform>();
+                if (txtRt != null)
+                {
+                    txtRt.localScale = Vector3.one;
+                    txtRt.anchorMin = new Vector2(0.04f, 0.08f);
+                    txtRt.anchorMax = new Vector2(0.96f, 0.92f);
+                    txtRt.anchoredPosition = Vector2.zero;
+                    txtRt.sizeDelta = Vector2.zero;
+                    txtRt.offsetMin = Vector2.zero;
+                    txtRt.offsetMax = Vector2.zero;
+                }
+                legacyText.resizeTextForBestFit = true;
+                legacyText.resizeTextMinSize = 12;
+                legacyText.resizeTextMaxSize = 28;
+                legacyText.alignment = TextAnchor.MiddleCenter;
+            }
+        }
+
+        ActualizarDimensionFranjaSegura();
+    }
+
+    private void NormalizarCanvasPantallaCompleta(Canvas fullScreenCanvas)
+    {
+        fullScreenCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        fullScreenCanvas.overrideSorting = true;
+        fullScreenCanvas.sortingOrder = 1000;
+
+        CanvasScaler scaler = fullScreenCanvas.GetComponent<CanvasScaler>();
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080f, 1920f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+        }
+
+        // 1. Asegurar que el fondo oscuro cubra el 100% de cualquier pantalla
+        Transform bgTransform = fullScreenCanvas.transform.Find("Background");
+        if (bgTransform != null)
+        {
+            RectTransform bgRt = bgTransform.GetComponent<RectTransform>();
+            if (bgRt != null)
+            {
+                bgRt.localScale = Vector3.one;
+                bgRt.anchorMin = Vector2.zero;
+                bgRt.anchorMax = Vector2.one;
+                bgRt.anchoredPosition = Vector2.zero;
+                bgRt.sizeDelta = Vector2.zero;
+                bgRt.offsetMin = Vector2.zero;
+                bgRt.offsetMax = Vector2.zero;
+            }
+            Image bgImg = bgTransform.GetComponent<Image>();
+            if (bgImg != null)
+            {
+                bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.94f);
+            }
+        }
+
+        // 2. Ajustar el contenedor "Ad" con anclas relativas dentro del SafeArea para que NUNCA se desborde
+        // ni en pantallas 20:9, ni en 16:9, ni en 4:3 tablets, ni en ventana libre del Editor
+        Transform adTransform = fullScreenCanvas.transform.Find("Ad");
+        if (adTransform != null)
+        {
+            float safeMinX = Screen.width > 0 ? Mathf.Clamp01(Screen.safeArea.xMin / Screen.width) : 0f;
+            float safeMaxX = Screen.width > 0 ? Mathf.Clamp01(Screen.safeArea.xMax / Screen.width) : 1f;
+            float safeMinY = Screen.height > 0 ? Mathf.Clamp01(Screen.safeArea.yMin / Screen.height) : 0f;
+            float safeMaxY = Screen.height > 0 ? Mathf.Clamp01(Screen.safeArea.yMax / Screen.height) : 1f;
+
+            RectTransform adRt = adTransform.GetComponent<RectTransform>();
+            if (adRt != null)
+            {
+                adRt.localScale = Vector3.one;
+                adRt.anchorMin = new Vector2(Mathf.Max(0.04f, safeMinX + 0.02f), Mathf.Max(0.06f, safeMinY + 0.03f));
+                adRt.anchorMax = new Vector2(Mathf.Min(0.96f, safeMaxX - 0.02f), Mathf.Min(0.94f, safeMaxY - 0.03f));
+                adRt.pivot = new Vector2(0.5f, 0.5f);
+                adRt.anchoredPosition = Vector2.zero;
+                adRt.sizeDelta = Vector2.zero;
+                adRt.offsetMin = Vector2.zero;
+                adRt.offsetMax = Vector2.zero;
+            }
+
+            // 3. Ajustar el botón "Close Ad" en la esquina superior izquierda/derecha dentro del contenedor
+            Transform btnTransform = adTransform.Find("Button");
+            if (btnTransform != null)
+            {
+                RectTransform btnRt = btnTransform.GetComponent<RectTransform>();
+                if (btnRt != null)
+                {
+                    btnRt.localScale = Vector3.one;
+                    btnRt.anchorMin = new Vector2(0.03f, 0.90f);
+                    btnRt.anchorMax = new Vector2(0.40f, 0.975f);
+                    btnRt.pivot = new Vector2(0.5f, 0.5f);
+                    btnRt.anchoredPosition = Vector2.zero;
+                    btnRt.sizeDelta = Vector2.zero;
+                    btnRt.offsetMin = Vector2.zero;
+                    btnRt.offsetMax = Vector2.zero;
+                }
+
+                Text btnText = btnTransform.GetComponentInChildren<Text>(true);
+                if (btnText != null)
+                {
+                    RectTransform btnTxtRt = btnText.GetComponent<RectTransform>();
+                    if (btnTxtRt != null)
+                    {
+                        btnTxtRt.localScale = Vector3.one;
+                        btnTxtRt.anchorMin = new Vector2(0.06f, 0.08f);
+                        btnTxtRt.anchorMax = new Vector2(0.94f, 0.92f);
+                        btnTxtRt.anchoredPosition = Vector2.zero;
+                        btnTxtRt.sizeDelta = Vector2.zero;
+                        btnTxtRt.offsetMin = Vector2.zero;
+                        btnTxtRt.offsetMax = Vector2.zero;
+                    }
+                    btnText.resizeTextForBestFit = true;
+                    btnText.resizeTextMinSize = 14;
+                    btnText.resizeTextMaxSize = 34;
+                    btnText.alignment = TextAnchor.MiddleCenter;
+                }
+            }
+
+            // 4. Ajustar el contador "5 second(s) remaining" de los anuncios bonificados para que nunca se corte
+            for (int i = 0; i < adTransform.childCount; i++)
+            {
+                Transform child = adTransform.GetChild(i);
+                if (child != btnTransform && child.name == "Text")
+                {
+                    RectTransform countRt = child.GetComponent<RectTransform>();
+                    if (countRt != null)
+                    {
+                        countRt.localScale = Vector3.one;
+                        countRt.anchorMin = new Vector2(0.43f, 0.90f);
+                        countRt.anchorMax = new Vector2(0.97f, 0.975f);
+                        countRt.pivot = new Vector2(0.5f, 0.5f);
+                        countRt.anchoredPosition = Vector2.zero;
+                        countRt.sizeDelta = Vector2.zero;
+                        countRt.offsetMin = Vector2.zero;
+                        countRt.offsetMax = Vector2.zero;
+                    }
+
+                    Text countTxt = child.GetComponent<Text>();
+                    if (countTxt != null)
+                    {
+                        countTxt.resizeTextForBestFit = true;
+                        countTxt.resizeTextMinSize = 12;
+                        countTxt.resizeTextMaxSize = 30;
+                        countTxt.alignment = TextAnchor.MiddleRight;
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 1. BANNER ADAPTATIVO (ca-app-pub-2266949018056491/9799830280)
+    // Política AdMob: 1 solo banner fijo en el borde inferior, usando
+    // Anchored Adaptive Banner (FullWidth) para ajustarse a cualquier pantalla.
     // =========================================================================
 
     public void CargarYMostrarBanner()
@@ -152,13 +418,17 @@ public class AdMobManager : MonoBehaviour
             bannerView = null;
         }
 
-        // Usamos Banner estándar (320x50) en la posición inferior fija
-        bannerView = new BannerView(bannerAdUnitId, AdSize.Banner, AdPosition.Bottom);
+        // Usamos Anchored Adaptive Banner de ancho completo (AdSize.FullWidth) según la orientación actual,
+        // que se adapta automáticamente al ancho exacto de cualquier teléfono o tablet.
+        AdSize adaptiveSize = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
+        bannerView = new BannerView(bannerAdUnitId, adaptiveSize, AdPosition.Bottom);
 
         bannerView.OnBannerAdLoaded += () =>
         {
             bannerVisible = true;
-            Debug.Log("[AdMob] Banner cargado y visible en AdPosition.Bottom.");
+            AjustarCanvasesDeAnunciosEnPantalla();
+            ActualizarDimensionFranjaSegura();
+            Debug.Log($"[AdMob] Adaptive Banner cargado ({bannerView.GetWidthInPixels()}x{bannerView.GetHeightInPixels()} px) en AdPosition.Bottom.");
         };
 
         bannerView.OnBannerAdLoadFailed += (LoadAdError error) =>
@@ -168,6 +438,7 @@ public class AdMobManager : MonoBehaviour
         };
 
         bannerView.LoadAd(new AdRequest());
+        AjustarCanvasesDeAnunciosEnPantalla();
     }
 
     public void MostrarBannerSiDisponible()
@@ -176,6 +447,7 @@ public class AdMobManager : MonoBehaviour
         {
             bannerView.Show();
             bannerVisible = true;
+            AjustarCanvasesDeAnunciosEnPantalla();
         }
     }
 
@@ -199,62 +471,90 @@ public class AdMobManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Crea un zócalo reservado en el borde inferior del Canvas (0% a 6.5% de altura)
-    /// para separar visualmente el Banner de los controles del juego y evitar clics accidentales.
+    /// Crea y actualiza el zócalo reservado en el borde inferior del Canvas
+    /// calculando su altura según el tamaño real del Adaptive Banner y el SafeArea del dispositivo.
     /// </summary>
     public void CrearFranjaSeguraBannerUI()
     {
-        if (bannerSafeZoneBar != null) return;
+        if (bannerSafeZoneBar == null)
+        {
+            Canvas mainCanvas = FindFirstObjectByType<Canvas>();
+            if (mainCanvas == null) return;
 
-        Canvas mainCanvas = FindFirstObjectByType<Canvas>();
-        if (mainCanvas == null) return;
+            bannerSafeZoneBar = new GameObject("AdMobBannerSafeZone", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            bannerSafeZoneBar.transform.SetParent(mainCanvas.transform, false);
+            bannerSafeZoneBar.transform.SetAsLastSibling();
 
-        bannerSafeZoneBar = new GameObject("AdMobBannerSafeZone", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        bannerSafeZoneBar.transform.SetParent(mainCanvas.transform, false);
-        bannerSafeZoneBar.transform.SetAsLastSibling();
+            Image bg = bannerSafeZoneBar.GetComponent<Image>();
+            bg.color = new Color(0.03f, 0.05f, 0.08f, 0.98f);
+            bg.raycastTarget = true;
+
+            GameObject borderLine = new GameObject("SafeBorderLine", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            borderLine.transform.SetParent(bannerSafeZoneBar.transform, false);
+            RectTransform lineRt = borderLine.GetComponent<RectTransform>();
+            lineRt.localScale = Vector3.one;
+            lineRt.anchorMin = new Vector2(0f, 0.94f);
+            lineRt.anchorMax = new Vector2(1f, 1f);
+            lineRt.offsetMin = Vector2.zero;
+            lineRt.offsetMax = Vector2.zero;
+
+            Image lineImg = borderLine.GetComponent<Image>();
+            lineImg.color = new Color(0.22f, 0.30f, 0.42f, 0.85f);
+            lineImg.raycastTarget = false;
+
+            GameObject labelObj = new GameObject("SafeZoneLabel", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            labelObj.transform.SetParent(bannerSafeZoneBar.transform, false);
+            RectTransform lblRt = labelObj.GetComponent<RectTransform>();
+            lblRt.localScale = Vector3.one;
+            lblRt.anchorMin = new Vector2(0.05f, 0.08f);
+            lblRt.anchorMax = new Vector2(0.95f, 0.90f);
+            lblRt.offsetMin = Vector2.zero;
+            lblRt.offsetMax = Vector2.zero;
+
+            TextMeshProUGUI tmp = labelObj.GetComponent<TextMeshProUGUI>();
+            tmp.text = "ESPACIO PUBLICITARIO ADAPTATIVO (ADMOB)";
+            tmp.fontSizeMin = 9f;
+            tmp.fontSizeMax = 14f;
+            tmp.enableAutoSizing = true;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = new Color(0.45f, 0.52f, 0.62f, 0.65f);
+            tmp.raycastTarget = false;
+        }
+
+        ActualizarDimensionFranjaSegura();
+    }
+
+    private void ActualizarDimensionFranjaSegura()
+    {
+        if (bannerSafeZoneBar == null) return;
+
+        float ratioAltura = alturaRelativaBannerActual;
+        if (bannerView != null && Screen.height > 0)
+        {
+            float pxHeight = bannerView.GetHeightInPixels();
+            if (pxHeight > 10f)
+            {
+                float safeBottom = Mathf.Max(0f, Screen.safeArea.yMin);
+                ratioAltura = Mathf.Clamp((pxHeight + safeBottom + 8f) / Screen.height, 0.065f, 0.105f);
+            }
+        }
 
         RectTransform rt = bannerSafeZoneBar.GetComponent<RectTransform>();
-        rt.localScale = Vector3.one;
-        rt.anchorMin = new Vector2(0f, 0f);
-        rt.anchorMax = new Vector2(1f, 0.065f);
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
+        if (rt != null)
+        {
+            rt.localScale = Vector3.one;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, ratioAltura);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+        }
 
-        Image bg = bannerSafeZoneBar.GetComponent<Image>();
-        bg.color = new Color(0.03f, 0.05f, 0.08f, 0.98f);
-        bg.raycastTarget = true; // Bloquea toques accidentales hacia elementos debajo del banner
+        bannerSafeZoneBar.transform.SetAsLastSibling();
+    }
 
-        // Línea divisoria superior de seguridad (evita clics accidentales cerca del borde del anuncio)
-        GameObject borderLine = new GameObject("SafeBorderLine", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-        borderLine.transform.SetParent(bannerSafeZoneBar.transform, false);
-        RectTransform lineRt = borderLine.GetComponent<RectTransform>();
-        lineRt.localScale = Vector3.one;
-        lineRt.anchorMin = new Vector2(0f, 0.94f);
-        lineRt.anchorMax = new Vector2(1f, 1f);
-        lineRt.offsetMin = Vector2.zero;
-        lineRt.offsetMax = Vector2.zero;
-
-        Image lineImg = borderLine.GetComponent<Image>();
-        lineImg.color = new Color(0.22f, 0.30f, 0.42f, 0.85f);
-        lineImg.raycastTarget = false;
-
-        GameObject labelObj = new GameObject("SafeZoneLabel", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        labelObj.transform.SetParent(bannerSafeZoneBar.transform, false);
-        RectTransform lblRt = labelObj.GetComponent<RectTransform>();
-        lblRt.localScale = Vector3.one;
-        lblRt.anchorMin = new Vector2(0.05f, 0.08f);
-        lblRt.anchorMax = new Vector2(0.95f, 0.90f);
-        lblRt.offsetMin = Vector2.zero;
-        lblRt.offsetMax = Vector2.zero;
-
-        TextMeshProUGUI tmp = labelObj.GetComponent<TextMeshProUGUI>();
-        tmp.text = "ESPACIO PUBLICITARIO (ADMOB BANNER)";
-        tmp.fontSizeMin = 9f;
-        tmp.fontSizeMax = 14f;
-        tmp.enableAutoSizing = true;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = new Color(0.45f, 0.52f, 0.62f, 0.65f);
-        tmp.raycastTarget = false;
+    public float ObtenerAlturaRelativaZonaSeguraBanner()
+    {
+        return Mathf.Clamp(alturaRelativaBannerActual, 0.065f, 0.105f);
     }
 
     // =========================================================================
@@ -286,7 +586,6 @@ public class AdMobManager : MonoBehaviour
             RegistrarEventosAppOpen(appOpenAd);
             Debug.Log("[AdMob] AppOpenAd (Carga de aplicación) listo.");
 
-            // Si es la apertura inicial en frío de la app y estamos dentro de los primeros segundos en el menú, lo mostramos
             if (mostrarAppOpenEnPrimerInicio && Time.realtimeSinceStartup < 12f && !anuncioPantallaCompletaActivo)
             {
                 mostrarAppOpenEnPrimerInicio = false;
@@ -306,7 +605,6 @@ public class AdMobManager : MonoBehaviour
     {
         if (state == AppState.Foreground)
         {
-            // Evitar que el regreso a primer plano tras cerrar un Intersticial o Bonificado dispare otro anuncio encima
             if (Time.realtimeSinceStartup - ultimoCierrePantallaCompletaTiempo < 5f)
             {
                 return;
@@ -320,7 +618,6 @@ public class AdMobManager : MonoBehaviour
     {
         if (anuncioPantallaCompletaActivo) return;
 
-        // Respetar tiempo mínimo entre anuncios de pantalla completa para no saturar al usuario
         if (Time.realtimeSinceStartup - ultimoAnuncioPantallaCompletaTiempo < cooldownPantallaCompletaSegundos)
         {
             return;
@@ -336,6 +633,7 @@ public class AdMobManager : MonoBehaviour
         ultimoAnuncioPantallaCompletaTiempo = Time.realtimeSinceStartup;
         OcultarBannerTemporalmente();
         appOpenAd.Show();
+        AjustarCanvasesDeAnunciosEnPantalla();
     }
 
     private void RegistrarEventosAppOpen(AppOpenAd ad)
@@ -344,6 +642,7 @@ public class AdMobManager : MonoBehaviour
         {
             anuncioPantallaCompletaActivo = true;
             OcultarBannerTemporalmente();
+            AjustarCanvasesDeAnunciosEnPantalla();
         };
 
         ad.OnAdFullScreenContentClosed += () =>
@@ -391,11 +690,6 @@ public class AdMobManager : MonoBehaviour
         });
     }
 
-    /// <summary>
-    /// Registra una acción de transición natural del usuario (cambiar de nivel, volver al menú, reiniciar)
-    /// y muestra un anuncio Intersticial SOLO si se cumple el mínimo legal de >= 2 acciones y el cooldown.
-    /// Ejecuta <paramref name="alContinuar"/> inmediatamente si no se muestra anuncio, o al cerrarse el anuncio.
-    /// </summary>
     public void RegistrarTransicionYMostrarIntersticialSiCorresponde(Action alContinuar)
     {
         contadorAccionesTransicion++;
@@ -442,6 +736,7 @@ public class AdMobManager : MonoBehaviour
             };
 
             interstitialAd.Show();
+            AjustarCanvasesDeAnunciosEnPantalla();
         }
         else
         {
@@ -487,11 +782,6 @@ public class AdMobManager : MonoBehaviour
         return rewardedInterstitialAd != null && rewardedInterstitialAd.CanShowAd() && !anuncioPantallaCompletaActivo;
     }
 
-    /// <summary>
-    /// Se invoca al avanzar de un nivel completado al siguiente.
-    /// Si el Intersticial Bonificado está listo, muestra la pantalla introductoria reglamentaria con opción "No, gracias"
-    /// para otorgar +2 Comodines. En caso contrario, evalúa el Intersticial estándar cumpliendo la regla de 2 acciones.
-    /// </summary>
     public void IntentarTransicionVictoriaSiguienteNivel(Action avanzarNivelCallback, int comodinesRecompensa = 2)
     {
         contadorNivelesCompletados++;
@@ -502,7 +792,6 @@ public class AdMobManager : MonoBehaviour
             return;
         }
 
-        // Si el Intersticial Bonificado no está disponible en este momento, recargarlo y usar la transición legal con Intersticial estándar
         CargarRewardedInterstitialAd();
         RegistrarTransicionYMostrarIntersticialSiCorresponde(avanzarNivelCallback);
     }
@@ -544,7 +833,7 @@ public class AdMobManager : MonoBehaviour
             {
                 promptCountdownText.text = $"El anuncio bonificado comenzará en {restantes} s...";
             }
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSecondsRealtime(1f);
             restantes--;
         }
 
@@ -631,6 +920,8 @@ public class AdMobManager : MonoBehaviour
                 }
             }
         });
+
+        AjustarCanvasesDeAnunciosEnPantalla();
     }
 
     private void RechazarIntersticialBonificado()
@@ -674,20 +965,18 @@ public class AdMobManager : MonoBehaviour
         overlayBg.color = new Color(0.03f, 0.06f, 0.11f, 0.95f);
         overlayBg.raycastTarget = true;
 
-        // Tarjeta central
         GameObject card = new GameObject("ModalCard", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         card.transform.SetParent(rewardedInterstitialPromptPanel.transform, false);
         RectTransform cardRt = card.GetComponent<RectTransform>();
         cardRt.localScale = Vector3.one;
-        cardRt.anchorMin = new Vector2(0.07f, 0.22f);
-        cardRt.anchorMax = new Vector2(0.93f, 0.78f);
+        cardRt.anchorMin = new Vector2(0.06f, 0.18f);
+        cardRt.anchorMax = new Vector2(0.94f, 0.82f);
         cardRt.offsetMin = Vector2.zero;
         cardRt.offsetMax = Vector2.zero;
 
         Image cardBg = card.GetComponent<Image>();
         cardBg.color = new Color(0.10f, 0.15f, 0.23f, 1f);
 
-        // Cuerpo de texto con divulgación clara de recompensa (Política AdMob)
         GameObject bodyObj = new GameObject("PromptBody", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         bodyObj.transform.SetParent(card.transform, false);
         RectTransform bodyRt = bodyObj.GetComponent<RectTransform>();
@@ -701,10 +990,9 @@ public class AdMobManager : MonoBehaviour
         promptBodyText.alignment = TextAlignmentOptions.Center;
         promptBodyText.color = Color.white;
         promptBodyText.enableAutoSizing = true;
-        promptBodyText.fontSizeMin = 15f;
+        promptBodyText.fontSizeMin = 14f;
         promptBodyText.fontSizeMax = 28f;
 
-        // Texto de cuenta regresiva
         GameObject countObj = new GameObject("PromptCountdown", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         countObj.transform.SetParent(card.transform, false);
         RectTransform countRt = countObj.GetComponent<RectTransform>();
@@ -719,27 +1007,25 @@ public class AdMobManager : MonoBehaviour
         promptCountdownText.fontStyle = FontStyles.Bold;
         promptCountdownText.color = new Color(0.98f, 0.84f, 0.32f, 1f);
         promptCountdownText.enableAutoSizing = true;
-        promptCountdownText.fontSizeMin = 14f;
+        promptCountdownText.fontSizeMin = 13f;
         promptCountdownText.fontSizeMax = 24f;
 
-        // Botón Aceptar ahora
         CrearBotonModal(
             card.transform,
             "BtnWatchNow",
             "🎬 Ver anuncio ahora (+2 ⚡ Comodines)",
-            new Vector2(0.08f, 0.18f),
-            new Vector2(0.92f, 0.30f),
+            new Vector2(0.07f, 0.18f),
+            new Vector2(0.93f, 0.30f),
             new Color(0.15f, 0.52f, 0.32f, 1f),
             AceptarYMostrarIntersticialBonificado
         );
 
-        // Botón Obligatorio de Opt-Out ("No, gracias") exigido por Google AdMob para Intersticial Bonificado
         CrearBotonModal(
             card.transform,
             "BtnNoThanksOptOut",
             "✖ No, gracias (Continuar al siguiente nivel)",
-            new Vector2(0.08f, 0.05f),
-            new Vector2(0.92f, 0.155f),
+            new Vector2(0.07f, 0.045f),
+            new Vector2(0.93f, 0.155f),
             new Color(0.26f, 0.31f, 0.40f, 1f),
             RechazarIntersticialBonificado
         );
@@ -786,7 +1072,7 @@ public class AdMobManager : MonoBehaviour
         tmp.fontStyle = FontStyles.Bold;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.enableAutoSizing = true;
-        tmp.fontSizeMin = 13f;
+        tmp.fontSizeMin = 12f;
         tmp.fontSizeMax = 22f;
         tmp.raycastTarget = false;
     }
@@ -825,10 +1111,6 @@ public class AdMobManager : MonoBehaviour
         return rewardedAd != null && rewardedAd.CanShowAd() && !anuncioPantallaCompletaActivo;
     }
 
-    /// <summary>
-    /// Muestra un anuncio Bonificado (RewardedAd) cuando el jugador presiona voluntariamente un botón de recompensa.
-    /// Al finalizar el video, acredita <paramref name="cantidadComodines"/> en WildcardManager.
-    /// </summary>
     public void MostrarAnuncioBonificado(int cantidadComodines = 1, Action alCompletarRecompensa = null)
     {
         if (!TieneAnuncioBonificadoListo())
@@ -890,5 +1172,7 @@ public class AdMobManager : MonoBehaviour
                 }
             }
         });
+
+        AjustarCanvasesDeAnunciosEnPantalla();
     }
 }
