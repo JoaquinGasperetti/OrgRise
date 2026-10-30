@@ -1529,6 +1529,7 @@ GameObject:
   - component: {fileID: 1875649805}
   - component: {fileID: 1875649806}
   - component: {fileID: 1875649807}
+  - component: {fileID: 1875649808}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -1736,6 +1737,27 @@ MonoBehaviour:
   tutorialPanel: {fileID: 162500655}
   tutorialText: {fileID: 203226522}
   botonContinuar: {fileID: 9376109}
+--- !u!114 &1875649808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1875649799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b4d7c12a9e34f56b123456789abcdef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AdMobManager
+  appId: ca-app-pub-2266949018056491~8163314986
+  bannerAdUnitId: ca-app-pub-2266949018056491/9799830280
+  rewardedAdUnitId: ca-app-pub-2266949018056491/2693038440
+  appOpenAdUnitId: ca-app-pub-2266949018056491/6383329457
+  interstitialAdUnitId: ca-app-pub-2266949018056491/4224069973
+  rewardedInterstitialAdUnitId: ca-app-pub-2266949018056491/2347434413
+  minAccionesParaIntersticial: 2
+  cooldownPantallaCompletaSegundos: 45
+  segundosIntroIntersticialBonificado: 4
 --- !u!1 &1897581034
 GameObject:
   m_ObjectHideFlags: 0

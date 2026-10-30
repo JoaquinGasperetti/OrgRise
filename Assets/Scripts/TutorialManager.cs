@@ -12,6 +12,7 @@ public class TutorialManager : MonoBehaviour
     public Button botonContinuar;
 
     private Button botonIrAlMenuEnVictoria;
+    private Button botonBonificadoEnVictoria;
 
     private int pasoActual = 0;
     private bool tutorialActivo = false;
@@ -67,8 +68,9 @@ public class TutorialManager : MonoBehaviour
             if (panelRt != null)
             {
                 panelRt.localScale = Vector3.one;
-                panelRt.anchorMin = Vector2.zero;
-                panelRt.anchorMax = Vector2.one;
+                // Dejamos libre 0.00 a 0.065 abajo para no tapar ni tocar el Banner de AdMob
+                panelRt.anchorMin = new Vector2(0f, 0.065f);
+                panelRt.anchorMax = new Vector2(1f, 1f);
                 panelRt.offsetMin = Vector2.zero;
                 panelRt.offsetMax = Vector2.zero;
             }
@@ -76,7 +78,7 @@ public class TutorialManager : MonoBehaviour
             Image panelImg = tutorialPanel.GetComponent<Image>();
             if (panelImg != null)
             {
-                panelImg.color = new Color(0.04f, 0.07f, 0.12f, 0.92f);
+                panelImg.color = new Color(0.04f, 0.07f, 0.12f, 0.94f);
                 panelImg.raycastTarget = true;
             }
         }
@@ -87,16 +89,16 @@ public class TutorialManager : MonoBehaviour
             if (txtRt != null)
             {
                 txtRt.localScale = Vector3.one;
-                txtRt.anchorMin = new Vector2(0.08f, 0.36f);
-                txtRt.anchorMax = new Vector2(0.92f, 0.80f);
+                txtRt.anchorMin = new Vector2(0.08f, 0.39f);
+                txtRt.anchorMax = new Vector2(0.92f, 0.86f);
                 txtRt.offsetMin = Vector2.zero;
                 txtRt.offsetMax = Vector2.zero;
             }
 
             tutorialText.margin = Vector4.zero;
             tutorialText.enableAutoSizing = true;
-            tutorialText.fontSizeMin = 20f;
-            tutorialText.fontSizeMax = 36f;
+            tutorialText.fontSizeMin = 18f;
+            tutorialText.fontSizeMax = 34f;
             tutorialText.alignment = TextAlignmentOptions.Center;
         }
 
@@ -106,8 +108,8 @@ public class TutorialManager : MonoBehaviour
             if (btnRt != null)
             {
                 btnRt.localScale = Vector3.one;
-                btnRt.anchorMin = new Vector2(0.18f, 0.22f);
-                btnRt.anchorMax = new Vector2(0.82f, 0.30f);
+                btnRt.anchorMin = new Vector2(0.14f, 0.28f);
+                btnRt.anchorMax = new Vector2(0.86f, 0.36f);
                 btnRt.offsetMin = Vector2.zero;
                 btnRt.offsetMax = Vector2.zero;
             }
@@ -126,62 +128,114 @@ public class TutorialManager : MonoBehaviour
                 }
                 btnTxt.margin = Vector4.zero;
                 btnTxt.enableAutoSizing = true;
-                btnTxt.fontSizeMin = 18f;
-                btnTxt.fontSizeMax = 32f;
+                btnTxt.fontSizeMin = 17f;
+                btnTxt.fontSizeMax = 30f;
                 btnTxt.fontStyle = FontStyles.Bold;
                 btnTxt.alignment = TextAlignmentOptions.Center;
             }
         }
 
-        AsegurarBotonMenuEnModal();
+        AsegurarBotonesEnModal();
     }
 
-    private void AsegurarBotonMenuEnModal()
+    private void AsegurarBotonesEnModal()
     {
-        if (botonIrAlMenuEnVictoria != null || tutorialPanel == null) return;
+        if (tutorialPanel == null) return;
 
-        GameObject btnObj = new GameObject("BotonVolverAlMenu", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-        btnObj.transform.SetParent(tutorialPanel.transform, false);
-
-        RectTransform rt = btnObj.GetComponent<RectTransform>();
-        rt.localScale = Vector3.one;
-        rt.anchorMin = new Vector2(0.18f, 0.12f);
-        rt.anchorMax = new Vector2(0.82f, 0.195f);
-        rt.offsetMin = Vector2.zero;
-        rt.offsetMax = Vector2.zero;
-
-        Image img = btnObj.GetComponent<Image>();
-        img.color = new Color(0.20f, 0.27f, 0.38f, 1f);
-
-        botonIrAlMenuEnVictoria = btnObj.GetComponent<Button>();
-        botonIrAlMenuEnVictoria.onClick.AddListener(() =>
+        // Botón voluntario de Anuncio Bonificado en pantalla de victoria (+2 Comodines)
+        if (botonBonificadoEnVictoria == null)
         {
-            OcultarPanelInmediato();
-            if (LevelManager.Instance != null)
+            GameObject rewObj = new GameObject("BotonBonificadoVictoria", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            rewObj.transform.SetParent(tutorialPanel.transform, false);
+
+            RectTransform rewRt = rewObj.GetComponent<RectTransform>();
+            rewRt.localScale = Vector3.one;
+            rewRt.anchorMin = new Vector2(0.14f, 0.185f);
+            rewRt.anchorMax = new Vector2(0.86f, 0.26f);
+            rewRt.offsetMin = Vector2.zero;
+            rewRt.offsetMax = Vector2.zero;
+
+            Image rewImg = rewObj.GetComponent<Image>();
+            rewImg.color = new Color(0.42f, 0.22f, 0.58f, 1f);
+
+            botonBonificadoEnVictoria = rewObj.GetComponent<Button>();
+            botonBonificadoEnVictoria.onClick.AddListener(() =>
             {
-                LevelManager.Instance.MostrarMenuPrincipal();
-            }
-        });
+                if (AdMobManager.Instance != null)
+                {
+                    AdMobManager.Instance.MostrarAnuncioBonificado(2);
+                }
+            });
 
-        GameObject txtObj = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-        txtObj.transform.SetParent(btnObj.transform, false);
-        RectTransform txtRt = txtObj.GetComponent<RectTransform>();
-        txtRt.localScale = Vector3.one;
-        txtRt.anchorMin = Vector2.zero;
-        txtRt.anchorMax = Vector2.one;
-        txtRt.offsetMin = new Vector2(10f, 4f);
-        txtRt.offsetMax = new Vector2(-10f, -4f);
+            GameObject rewTxtObj = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            rewTxtObj.transform.SetParent(rewObj.transform, false);
+            RectTransform rewTxtRt = rewTxtObj.GetComponent<RectTransform>();
+            rewTxtRt.localScale = Vector3.one;
+            rewTxtRt.anchorMin = Vector2.zero;
+            rewTxtRt.anchorMax = Vector2.one;
+            rewTxtRt.offsetMin = new Vector2(10f, 4f);
+            rewTxtRt.offsetMax = new Vector2(-10f, -4f);
 
-        TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
-        tmp.text = "☰ Selector de Niveles / Menú";
-        tmp.color = Color.white;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableAutoSizing = true;
-        tmp.fontSizeMin = 16f;
-        tmp.fontSizeMax = 26f;
+            TextMeshProUGUI rewTmp = rewTxtObj.GetComponent<TextMeshProUGUI>();
+            rewTmp.text = "🎬 Bono Extra: +2 ⚡ Comodines (Ver Video)";
+            rewTmp.color = Color.white;
+            rewTmp.fontStyle = FontStyles.Bold;
+            rewTmp.alignment = TextAlignmentOptions.Center;
+            rewTmp.enableAutoSizing = true;
+            rewTmp.fontSizeMin = 14f;
+            rewTmp.fontSizeMax = 24f;
+            rewTmp.raycastTarget = false;
 
-        btnObj.SetActive(false);
+            rewObj.SetActive(false);
+        }
+
+        // Botón Volver al Menú Principal
+        if (botonIrAlMenuEnVictoria == null)
+        {
+            GameObject btnObj = new GameObject("BotonVolverAlMenu", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            btnObj.transform.SetParent(tutorialPanel.transform, false);
+
+            RectTransform rt = btnObj.GetComponent<RectTransform>();
+            rt.localScale = Vector3.one;
+            rt.anchorMin = new Vector2(0.14f, 0.09f);
+            rt.anchorMax = new Vector2(0.86f, 0.165f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            Image img = btnObj.GetComponent<Image>();
+            img.color = new Color(0.20f, 0.27f, 0.38f, 1f);
+
+            botonIrAlMenuEnVictoria = btnObj.GetComponent<Button>();
+            botonIrAlMenuEnVictoria.onClick.AddListener(() =>
+            {
+                OcultarPanelInmediato();
+                if (LevelManager.Instance != null)
+                {
+                    LevelManager.Instance.MostrarMenuPrincipal();
+                }
+            });
+
+            GameObject txtObj = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            txtObj.transform.SetParent(btnObj.transform, false);
+            RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+            txtRt.localScale = Vector3.one;
+            txtRt.anchorMin = Vector2.zero;
+            txtRt.anchorMax = Vector2.one;
+            txtRt.offsetMin = new Vector2(10f, 4f);
+            txtRt.offsetMax = new Vector2(-10f, -4f);
+
+            TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
+            tmp.text = "☰ Selector de Niveles / Menú";
+            tmp.color = Color.white;
+            tmp.fontStyle = FontStyles.Bold;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.enableAutoSizing = true;
+            tmp.fontSizeMin = 15f;
+            tmp.fontSizeMax = 25f;
+            tmp.raycastTarget = false;
+
+            btnObj.SetActive(false);
+        }
     }
 
     public void IniciarTutorial()
@@ -203,12 +257,21 @@ public class TutorialManager : MonoBehaviour
         {
             botonIrAlMenuEnVictoria.gameObject.SetActive(false);
         }
+        if (botonBonificadoEnVictoria != null)
+        {
+            botonBonificadoEnVictoria.gameObject.SetActive(false);
+        }
 
         if (tutorialPanel != null)
         {
             tutorialPanel.SetActive(true);
             tutorialPanel.transform.SetAsLastSibling();
         }
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.CrearFranjaSeguraBannerUI();
+        }
+
         ActualizarTextoBoton("Continuar");
         MostrarPaso(pasoActual);
     }
@@ -242,7 +305,19 @@ public class TutorialManager : MonoBehaviour
 
             if (LevelManager.Instance != null)
             {
-                LevelManager.Instance.AvanzarSiguienteNivel();
+                if (AdMobManager.Instance != null)
+                {
+                    // En la transición natural de fin de nivel activamos el Intersticial Bonificado (con prompt opt-out reglamentario)
+                    // o el Intersticial estándar si corresponde por conteo de acciones.
+                    AdMobManager.Instance.IntentarTransicionVictoriaSiguienteNivel(
+                        () => LevelManager.Instance.AvanzarSiguienteNivel(),
+                        2
+                    );
+                }
+                else
+                {
+                    LevelManager.Instance.AvanzarSiguienteNivel();
+                }
             }
             return;
         }
@@ -289,6 +364,10 @@ public class TutorialManager : MonoBehaviour
             tutorialPanel.SetActive(true);
             tutorialPanel.transform.SetAsLastSibling();
         }
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.CrearFranjaSeguraBannerUI();
+        }
 
         if (tutorialText != null)
         {
@@ -299,6 +378,11 @@ public class TutorialManager : MonoBehaviour
         {
             botonContinuar.gameObject.SetActive(true);
             ActualizarTextoBoton("Siguiente Nivel ➔");
+        }
+
+        if (botonBonificadoEnVictoria != null)
+        {
+            botonBonificadoEnVictoria.gameObject.SetActive(true);
         }
 
         if (botonIrAlMenuEnVictoria != null)

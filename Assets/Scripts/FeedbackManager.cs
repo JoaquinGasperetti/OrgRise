@@ -94,11 +94,11 @@ public class FeedbackManager : MonoBehaviour
         toastObject = new GameObject("AcademicToastBanner", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         toastObject.transform.SetParent(mainCanvas.transform, false);
 
-        // Anclado en la franja inferior (1% a 7.5% de altura) debajo del botón Comodín sin salirse del teléfono
+        // Anclado entre 7.2% y 13.2% de altura: arriba del Banner inferior de AdMob (0%-6.5%) y debajo del botón Comodín (13.8%-19.2%)
         RectTransform rt = toastObject.GetComponent<RectTransform>();
         rt.localScale = Vector3.one;
-        rt.anchorMin = new Vector2(0.03f, 0.01f);
-        rt.anchorMax = new Vector2(0.97f, 0.078f);
+        rt.anchorMin = new Vector2(0.03f, 0.072f);
+        rt.anchorMax = new Vector2(0.97f, 0.132f);
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
 

@@ -123,13 +123,18 @@ public class LevelManager : MonoBehaviour
         CrearCabeceraAcademicaUI();
         CrearMenuPrincipalUI();
 
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.CrearFranjaSeguraBannerUI();
+        }
+
         // Al abrir la app mostramos el Menú Principal (ocultando cualquier modal abierto del tutorial hasta que empiece a jugar)
         if (TutorialManager.Instance != null)
         {
             TutorialManager.Instance.OcultarPanelInmediato();
         }
 
-        MostrarMenuPrincipal();
+        MostrarMenuPrincipalInterno();
     }
 
     private void NormalizarLayoutVerticalMovil()
@@ -150,7 +155,9 @@ public class LevelManager : MonoBehaviour
         {
             RectTransform spawnRt = ProceduralLevelGenerator.Instance.spawnArea;
             spawnRt.localScale = Vector3.one;
-            spawnRt.anchorMin = new Vector2(0.03f, 0.16f);
+            // Reservamos de 0.20 a 0.82 para dejar espacio holgado a los botones de Comodín/Bonificado (0.138-0.192),
+            // al Toast de estado (0.072-0.132) y al Banner inferior de AdMob (0.00-0.065)
+            spawnRt.anchorMin = new Vector2(0.03f, 0.20f);
             spawnRt.anchorMax = new Vector2(0.97f, 0.82f);
             spawnRt.offsetMin = Vector2.zero;
             spawnRt.offsetMax = Vector2.zero;
@@ -219,6 +226,20 @@ public class LevelManager : MonoBehaviour
 
     public void MostrarMenuPrincipal()
     {
+        bool veniaDePartida = mainMenuPanel != null && !mainMenuPanel.activeSelf && nodosActivos.Count > 0;
+
+        if (veniaDePartida && AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.RegistrarTransicionYMostrarIntersticialSiCorresponde(MostrarMenuPrincipalInterno);
+        }
+        else
+        {
+            MostrarMenuPrincipalInterno();
+        }
+    }
+
+    private void MostrarMenuPrincipalInterno()
+    {
         if (mainMenuPanel == null) CrearMenuPrincipalUI();
         if (mainMenuPanel != null)
         {
@@ -226,13 +247,23 @@ public class LevelManager : MonoBehaviour
             mainMenuPanel.transform.SetAsLastSibling();
         }
 
-        CambiarSubvistaMenu("home");
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.CrearFranjaSeguraBannerUI();
+        }
 
+        CambiarSubvistaMenu("home");
+        ActualizarBadgeMenu();
+    }
+
+    public void ActualizarBadgeMenu()
+    {
         if (menuStreakBadgeText != null && DailyStreakManager.Instance != null)
         {
             int racha = DailyStreakManager.Instance.currentStreak;
             string estadoHoy = DailyStreakManager.Instance.alreadyPlayedToday ? "Completado hoy ✓" : "Disponible hoy";
-            menuStreakBadgeText.text = $"🔥 Racha: <b>{racha} días</b>  |   Puzzle Diario: <color=#80CBC4>{estadoHoy}</color>";
+            int comodines = WildcardManager.Instance != null ? WildcardManager.Instance.wildcardsDisponibles : 2;
+            menuStreakBadgeText.text = $"🔥 Racha: <b>{racha}d</b>  |  ⚡ Comodines: <b>{comodines}</b>  |  <color=#80CBC4>{estadoHoy}</color>";
         }
     }
 
@@ -253,32 +284,56 @@ public class LevelManager : MonoBehaviour
 
     public void IniciarNivelCampanaDesdeMenu(int indice)
     {
-        enModoDiario = false;
-        indiceNivelCampana = Mathf.Clamp(indice, 0, nivelesCampana.Length - 1);
-        OcultarMenuPrincipal();
-        CargarNivelActual();
-
-        // Si eligen el Nivel 1 y aún no vieron el tutorial en esta sesión, lo mostramos
-        if (indiceNivelCampana == 0 && TutorialManager.Instance != null)
+        System.Action iniciarAccion = () =>
         {
-            TutorialManager.Instance.IniciarTutorial();
+            enModoDiario = false;
+            indiceNivelCampana = Mathf.Clamp(indice, 0, nivelesCampana.Length - 1);
+            OcultarMenuPrincipal();
+            CargarNivelActual();
+
+            // Si eligen el Nivel 1 y aún no vieron el tutorial en esta sesión, lo mostramos
+            if (indiceNivelCampana == 0 && TutorialManager.Instance != null)
+            {
+                TutorialManager.Instance.IniciarTutorial();
+            }
+        };
+
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.RegistrarTransicionYMostrarIntersticialSiCorresponde(iniciarAccion);
+        }
+        else
+        {
+            iniciarAccion.Invoke();
         }
     }
 
     public void IniciarDesafioDiarioDesdeMenu()
     {
-        enModoDiario = true;
-        OcultarMenuPrincipal();
-        CargarNivelActual();
-
-        if (FeedbackManager.Instance != null)
+        System.Action iniciarDiarioAccion = () =>
         {
-            int seed = ProceduralLevelGenerator.ObtenerSemillaDiaria();
-            FeedbackManager.Instance.MostrarMensajeEstado(
-                $"📅 Puzzle Diario iniciado (Semilla #{seed}). ¡Armá el organigrama para sumar a tu racha!",
-                new Color(0.14f, 0.36f, 0.54f, 0.95f),
-                3.2f
-            );
+            enModoDiario = true;
+            OcultarMenuPrincipal();
+            CargarNivelActual();
+
+            if (FeedbackManager.Instance != null)
+            {
+                int seed = ProceduralLevelGenerator.ObtenerSemillaDiaria();
+                FeedbackManager.Instance.MostrarMensajeEstado(
+                    $"📅 Puzzle Diario iniciado (Semilla #{seed}). ¡Armá el organigrama para sumar a tu racha!",
+                    new Color(0.14f, 0.36f, 0.54f, 0.95f),
+                    3.2f
+                );
+            }
+        };
+
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.RegistrarTransicionYMostrarIntersticialSiCorresponde(iniciarDiarioAccion);
+        }
+        else
+        {
+            iniciarDiarioAccion.Invoke();
         }
     }
 
@@ -348,10 +403,22 @@ public class LevelManager : MonoBehaviour
 
     public void ReiniciarNivelActual()
     {
-        CargarNivelActual();
-        if (FeedbackManager.Instance != null)
+        System.Action reiniciarAccion = () =>
         {
-            FeedbackManager.Instance.MostrarMensajeEstado("↻ Tablero reiniciado.", new Color(0.22f, 0.28f, 0.38f, 0.92f), 1.6f);
+            CargarNivelActual();
+            if (FeedbackManager.Instance != null)
+            {
+                FeedbackManager.Instance.MostrarMensajeEstado("↻ Tablero reiniciado.", new Color(0.22f, 0.28f, 0.38f, 0.92f), 1.6f);
+            }
+        };
+
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.RegistrarTransicionYMostrarIntersticialSiCorresponde(reiniciarAccion);
+        }
+        else
+        {
+            reiniciarAccion.Invoke();
         }
     }
 
@@ -511,8 +578,9 @@ public class LevelManager : MonoBehaviour
 
         RectTransform rootRt = mainMenuPanel.GetComponent<RectTransform>();
         rootRt.localScale = Vector3.one;
-        rootRt.anchorMin = Vector2.zero;
-        rootRt.anchorMax = Vector2.one;
+        // Dejamos libre la franja inferior 0.00 a 0.065 para el Banner de AdMob
+        rootRt.anchorMin = new Vector2(0f, 0.065f);
+        rootRt.anchorMax = new Vector2(1f, 1f);
         rootRt.offsetMin = Vector2.zero;
         rootRt.offsetMax = Vector2.zero;
 
@@ -534,9 +602,9 @@ public class LevelManager : MonoBehaviour
             mainHomeView.transform,
             "AcademicTag",
             "TRABAJO FINAL INTEGRADOR • GESTIÓN DE LA ORGANIZACIÓN",
-            new Vector2(0.06f, 0.88f),
-            new Vector2(0.94f, 0.93f),
-            14f, 22f,
+            new Vector2(0.06f, 0.90f),
+            new Vector2(0.94f, 0.95f),
+            13f, 21f,
             new Color(0.50f, 0.80f, 0.77f),
             FontStyles.Bold
         );
@@ -546,9 +614,9 @@ public class LevelManager : MonoBehaviour
             mainHomeView.transform,
             "GameTitle",
             "🏢 OrgRise",
-            new Vector2(0.06f, 0.77f),
-            new Vector2(0.94f, 0.88f),
-            40f, 76f,
+            new Vector2(0.06f, 0.79f),
+            new Vector2(0.94f, 0.90f),
+            38f, 72f,
             Color.white,
             FontStyles.Bold
         );
@@ -558,28 +626,28 @@ public class LevelManager : MonoBehaviour
             mainHomeView.transform,
             "GameSubtitle",
             "Simulador y Puzzle de Diseño de Estructuras Organizacionales\n<size=75%><color=#B0BEC5>Cadena de Mando • Tramo de Control • Departamentalización • Centralización</color></size>",
-            new Vector2(0.07f, 0.67f),
-            new Vector2(0.93f, 0.77f),
-            16f, 28f,
+            new Vector2(0.07f, 0.70f),
+            new Vector2(0.93f, 0.79f),
+            15f, 26f,
             new Color(0.95f, 0.85f, 0.35f),
             FontStyles.Normal
         );
 
-        // Tarjeta de estado de Racha Diaria
+        // Tarjeta de estado de Racha Diaria y Comodines
         GameObject streakCard = CrearPanelTarjeta(
             mainHomeView.transform,
             "StreakBadgeCard",
-            new Vector2(0.08f, 0.58f),
-            new Vector2(0.92f, 0.65f),
+            new Vector2(0.08f, 0.62f),
+            new Vector2(0.92f, 0.685f),
             new Color(0.11f, 0.16f, 0.24f, 1f)
         );
         menuStreakBadgeText = CrearTextoUI(
             streakCard.transform,
             "StreakBadgeText",
-            "🔥 Racha: 0 días  |  Puzzle Diario: Disponible hoy",
+            "🔥 Racha: 0d  |  ⚡ Comodines: 2  |  Disponible hoy",
             new Vector2(0.04f, 0.1f),
             new Vector2(0.96f, 0.9f),
-            15f, 25f,
+            14f, 24f,
             Color.white,
             FontStyles.Normal
         );
@@ -590,8 +658,8 @@ public class LevelManager : MonoBehaviour
             "BtnPlayCampaign",
             "▶  MODO CAMPAÑA ACADÉMICA",
             "Recorrido guiado por los 5 modelos de estructura organizacional",
-            new Vector2(0.08f, 0.44f),
-            new Vector2(0.92f, 0.55f),
+            new Vector2(0.08f, 0.495f),
+            new Vector2(0.92f, 0.60f),
             new Color(0.15f, 0.52f, 0.34f, 1f),
             () => IniciarNivelCampanaDesdeMenu(indiceNivelCampana < nivelesCampana.Length ? indiceNivelCampana : 0)
         );
@@ -602,8 +670,8 @@ public class LevelManager : MonoBehaviour
             "BtnOpenLevelSelector",
             "🗂️  SELECTOR DE NIVELES (5 CASOS)",
             "Elegí directamente qué concepto o estructura demostrar",
-            new Vector2(0.08f, 0.31f),
-            new Vector2(0.92f, 0.42f),
+            new Vector2(0.08f, 0.375f),
+            new Vector2(0.92f, 0.48f),
             new Color(0.16f, 0.38f, 0.62f, 1f),
             () => CambiarSubvistaMenu("selector")
         );
@@ -614,19 +682,37 @@ public class LevelManager : MonoBehaviour
             "BtnDailyChallenge",
             "📅  DESAFÍO DIARIO PROCEDURAL",
             "Generación algorítmica con semilla diaria y racha de victorias",
-            new Vector2(0.08f, 0.18f),
-            new Vector2(0.92f, 0.29f),
+            new Vector2(0.08f, 0.255f),
+            new Vector2(0.92f, 0.36f),
             new Color(0.58f, 0.36f, 0.12f, 1f),
             IniciarDesafioDiarioDesdeMenu
         );
 
-        // Botón 4: Guía Teórica / Conceptos de la Materia
+        // Botón 4: Anuncio Bonificado Voluntario (Política AdMob Rewarded Opt-In)
+        CrearBotonMenuGrande(
+            mainHomeView.transform,
+            "BtnRewardedAdMenu",
+            "🎬  CONSULTORÍA BONIFICADA (+2 ⚡ COMODINES)",
+            "Mirar un anuncio de video voluntario para acreditar +2 Comodines",
+            new Vector2(0.08f, 0.135f),
+            new Vector2(0.92f, 0.24f),
+            new Color(0.42f, 0.22f, 0.58f, 1f),
+            () =>
+            {
+                if (AdMobManager.Instance != null)
+                {
+                    AdMobManager.Instance.MostrarAnuncioBonificado(2, ActualizarBadgeMenu);
+                }
+            }
+        );
+
+        // Botón 5: Guía Teórica / Conceptos de la Materia (separado con margen sobre el Banner inferior)
         CrearBotonUI(
             mainHomeView.transform,
             "BtnGlossary",
             "📚 Marco Teórico de Gestión de la Organización",
-            new Vector2(0.08f, 0.08f),
-            new Vector2(0.92f, 0.155f),
+            new Vector2(0.08f, 0.035f),
+            new Vector2(0.92f, 0.115f),
             new Color(0.20f, 0.25f, 0.34f, 1f),
             () => CambiarSubvistaMenu("glossary")
         );
@@ -690,13 +776,13 @@ public class LevelManager : MonoBehaviour
             );
         }
 
-        // Botón Volver al Menú Principal
+        // Botón Volver al Menú Principal (con margen respecto al Banner inferior)
         CrearBotonUI(
             levelSelectorView.transform,
             "BtnBackFromSelector",
             "⬅ Volver al Menú Principal",
-            new Vector2(0.15f, 0.05f),
-            new Vector2(0.85f, 0.125f),
+            new Vector2(0.15f, 0.04f),
+            new Vector2(0.85f, 0.12f),
             new Color(0.24f, 0.29f, 0.38f, 1f),
             () => CambiarSubvistaMenu("home")
         );
@@ -720,7 +806,7 @@ public class LevelManager : MonoBehaviour
         GameObject card = CrearPanelTarjeta(
             glossaryView.transform,
             "GlossaryBodyCard",
-            new Vector2(0.06f, 0.16f),
+            new Vector2(0.06f, 0.15f),
             new Vector2(0.94f, 0.87f),
             new Color(0.10f, 0.14f, 0.21f, 1f)
         );
@@ -755,8 +841,8 @@ public class LevelManager : MonoBehaviour
             glossaryView.transform,
             "BtnBackFromGlossary",
             "⬅ Volver al Menú Principal",
-            new Vector2(0.15f, 0.05f),
-            new Vector2(0.85f, 0.125f),
+            new Vector2(0.15f, 0.04f),
+            new Vector2(0.85f, 0.12f),
             new Color(0.24f, 0.29f, 0.38f, 1f),
             () => CambiarSubvistaMenu("home")
         );
@@ -897,7 +983,7 @@ public class LevelManager : MonoBehaviour
             titulo,
             new Vector2(0.04f, 0.45f),
             new Vector2(0.96f, 0.92f),
-            16f, 28f,
+            15f, 26f,
             Color.white,
             FontStyles.Bold
         );
@@ -908,7 +994,7 @@ public class LevelManager : MonoBehaviour
             subtitulo,
             new Vector2(0.04f, 0.08f),
             new Vector2(0.96f, 0.45f),
-            12f, 20f,
+            11f, 19f,
             new Color(0.90f, 0.94f, 0.98f),
             FontStyles.Normal
         );
