@@ -9,7 +9,7 @@
   <files />
   <settings>
     <setting name="androidAbis" value="arm64-v8a,armeabi-v7a" />
-    <setting name="bundleId" value="com.HKemtrentainment.OrgRise" />
+    <setting name="bundleId" value="com.hkentertainment.orgrise" />
     <setting name="gradleBuildEnabled" value="True" />
     <setting name="gradlePropertiesTemplateEnabled" value="True" />
     <setting name="gradleTemplateEnabled" value="True" />

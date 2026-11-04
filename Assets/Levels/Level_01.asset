@@ -12,14 +12,57 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a44755883e16a5540a51661f517c2ec5, type: 3}
   m_Name: Level_01
   m_EditorClassIdentifier: Assembly-CSharp::LevelData
-  idNivel: 
+  idNivel: Nivel_01
+  tituloAcademico: 'Nivel 1: Cadena de Mando y Tramo de Control'
+  descripcionTeorica: 'Estructura Lineal-Funcional clasica segun Fayol.'
+  criterioDepartamentalizacion: 0
+  modoAutoridad: 0
   empleados:
-  - nombreRol: CEO
-    maxReportesDirectos: 3
+  - nombreRol: 'CEO'
+    nivel: 0
+    departamento: 0
+    maxReportesDirectos: 2
     esDirectorGeneral: 1
-  - nombreRol: Empleado Misa
-    maxReportesDirectos: 3
+    esStaff: 0
+  - nombreRol: 'Dir. Finanzas'
+    nivel: 1
+    departamento: 1
+    maxReportesDirectos: 1
     esDirectorGeneral: 0
-  - nombreRol: Empleado Fran
-    maxReportesDirectos: 3
+    esStaff: 0
+  - nombreRol: 'Dir. Comercial'
+    nivel: 1
+    departamento: 2
+    maxReportesDirectos: 1
     esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Gte. Contable'
+    nivel: 2
+    departamento: 1
+    maxReportesDirectos: 2
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Gte. Ventas'
+    nivel: 2
+    departamento: 2
+    maxReportesDirectos: 2
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Analista Contable'
+    nivel: 3
+    departamento: 1
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Auditor Junior'
+    nivel: 3
+    departamento: 1
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Ejecutivo Cuentas'
+    nivel: 3
+    departamento: 2
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0

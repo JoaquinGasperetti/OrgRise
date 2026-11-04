@@ -24,4 +24,5 @@ public class NodeSetup
     public Departamento departamento = Departamento.Finanzas;
     public int maxReportesDirectos = 2;
     public bool esDirectorGeneral; // Sirve para identificar la raíz del árbol
+    public bool esStaff; // Órgano de staff / asesoría directa
 }

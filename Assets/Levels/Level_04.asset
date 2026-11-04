@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a44755883e16a5540a51661f517c2ec5, type: 3}
+  m_Name: Level_04
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  idNivel: Nivel_04
+  tituloAcademico: 'Nivel 4: Estructura Centralizada (Chata)'
+  descripcionTeorica: 'Tramo de control amplio en la cúpula y menor cantidad de mandos intermedios para supervisión directa.'
+  criterioDepartamentalizacion: 0
+  modoAutoridad: 1
+  empleados:
+  - nombreRol: 'Presidencia'
+    nivel: 0
+    departamento: 0
+    maxReportesDirectos: 4
+    esDirectorGeneral: 1
+    esStaff: 0
+  - nombreRol: 'Dir. Operaciones'
+    nivel: 1
+    departamento: 3
+    maxReportesDirectos: 3
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Dir. Tecnología'
+    nivel: 1
+    departamento: 4
+    maxReportesDirectos: 3
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Desarrollador Front'
+    nivel: 3
+    departamento: 4
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Desarrollador Cloud'
+    nivel: 3
+    departamento: 4
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Técnico Infra'
+    nivel: 3
+    departamento: 4
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Operador Logística'
+    nivel: 3
+    departamento: 3
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Analista Depósito'
+    nivel: 3
+    departamento: 3
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0

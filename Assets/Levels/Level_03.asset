@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a44755883e16a5540a51661f517c2ec5, type: 3}
+  m_Name: Level_03
+  m_EditorClassIdentifier: Assembly-CSharp::LevelData
+  idNivel: Nivel_03
+  tituloAcademico: 'Nivel 3: Departamentalización Geográfica'
+  descripcionTeorica: 'Organización territorial por zonas operativas (Norte, Centro, Sur) para responder a demandas regionales.'
+  criterioDepartamentalizacion: 2
+  modoAutoridad: 0
+  empleados:
+  - nombreRol: 'Director General'
+    nivel: 0
+    departamento: 0
+    maxReportesDirectos: 3
+    esDirectorGeneral: 1
+    esStaff: 0
+  - nombreRol: 'Reg. Norte'
+    nivel: 1
+    departamento: 1
+    maxReportesDirectos: 1
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Reg. Centro'
+    nivel: 1
+    departamento: 2
+    maxReportesDirectos: 1
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Reg. Sur'
+    nivel: 1
+    departamento: 3
+    maxReportesDirectos: 1
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Coord. NOA'
+    nivel: 2
+    departamento: 1
+    maxReportesDirectos: 2
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Coord. Metropolitana'
+    nivel: 2
+    departamento: 2
+    maxReportesDirectos: 2
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Coord. Patagonia'
+    nivel: 2
+    departamento: 3
+    maxReportesDirectos: 2
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Técnico Salta'
+    nivel: 3
+    departamento: 1
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Ejecutivo CABA'
+    nivel: 3
+    departamento: 2
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0
+  - nombreRol: 'Operador Comodoro'
+    nivel: 3
+    departamento: 3
+    maxReportesDirectos: 0
+    esDirectorGeneral: 0
+    esStaff: 0

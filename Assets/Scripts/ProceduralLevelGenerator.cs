@@ -71,6 +71,58 @@ public class ProceduralLevelGenerator : MonoBehaviour
         );
     }
 
+    /// <summary>
+    /// Genera la disposición de nodos a partir de un ScriptableObject LevelData preconfigurado.
+    /// </summary>
+    public void CargarDesdeLevelData(LevelData data)
+    {
+        if (data == null || data.empleados == null || data.empleados.Count == 0) return;
+
+        LimpiarTablero();
+        Canvas.ForceUpdateCanvases();
+
+        // Agrupamos los nodos por nivel jerárquico
+        Dictionary<NivelJerarquico, List<NodeSetup>> nodosPorNivel = new Dictionary<NivelJerarquico, List<NodeSetup>>();
+        foreach (NivelJerarquico nv in System.Enum.GetValues(typeof(NivelJerarquico)))
+        {
+            nodosPorNivel[nv] = new List<NodeSetup>();
+        }
+
+        foreach (var emp in data.empleados)
+        {
+            nodosPorNivel[emp.nivel].Add(emp);
+        }
+
+        int totalFilas = 4;
+        foreach (NivelJerarquico nv in System.Enum.GetValues(typeof(NivelJerarquico)))
+        {
+            List<NodeSetup> lista = nodosPorNivel[nv];
+            for (int i = 0; i < lista.Count; i++)
+            {
+                NodeSetup item = lista[i];
+                string etiquetaArea = ObtenerEtiquetaCriterio(item.departamento, data.criterioDepartamentalizacion);
+                string tituloUI = $"{item.nombreRol}\n{etiquetaArea}";
+
+                EmployeeNode nodo = CrearNodoUI(
+                    item.nivel,
+                    item.departamento,
+                    tituloUI,
+                    item.esDirectorGeneral,
+                    item.maxReportesDirectos,
+                    i,
+                    lista.Count,
+                    totalFilas
+                );
+
+                if (item.esStaff)
+                {
+                    nodo.isStaffNode = true;
+                    nodo.ConfigureVisuals(tituloUI, ObtenerColorArea(Departamento.StaffAsesoria));
+                }
+            }
+        }
+    }
+
     public void GenerarNivelAcademico(
         int semilla,
         int cantidad,
@@ -78,8 +130,6 @@ public class ProceduralLevelGenerator : MonoBehaviour
         ModoAutoridad autoridad)
     {
         LimpiarTablero();
-
-        // Forzamos actualización de layout del Canvas antes de calcular posiciones en móvil vertical
         Canvas.ForceUpdateCanvases();
 
         Random.InitState(semilla);
@@ -198,6 +248,7 @@ public class ProceduralLevelGenerator : MonoBehaviour
             Departamento area = areasActivas[i];
             string etiquetaArea = ObtenerEtiquetaCriterio(area, criterio);
             string nombreMando = ObtenerNombreUnico(new List<string>(prefijosDirector), etiquetaArea, nombresUsados);
+
             int empleadosDeEstaArea = Mathf.CeilToInt((float)numEmpleados / numMandos) + 1;
             CrearNodoUI(NivelJerarquico.Director, area, nombreMando, false, empleadosDeEstaArea, i, numMandos, 3);
         }
@@ -214,6 +265,7 @@ public class ProceduralLevelGenerator : MonoBehaviour
     public string ObtenerEtiquetaCriterio(Departamento depto, CriterioDepartamentalizacion criterio)
     {
         if (depto == Departamento.General) return "General";
+        if (depto == Departamento.StaffAsesoria) return "Staff Asesoría";
 
         switch (criterio)
         {
@@ -309,13 +361,11 @@ public class ProceduralLevelGenerator : MonoBehaviour
         float areaWidth = spawnArea.rect.width > 100f ? spawnArea.rect.width : 940f;
         float areaHeight = spawnArea.rect.height > 100f ? spawnArea.rect.height : 1200f;
 
-        // Calculamos el ancho y alto seguros de cada tarjeta según cuántos nodos comparten la fila en vertical
         float espacioPorColumna = areaWidth / Mathf.Max(1, totalEnFila);
         float anchoTarjeta = Mathf.Clamp(espacioPorColumna * 0.88f, 130f, 220f);
         float altoTarjeta = Mathf.Clamp((areaHeight / Mathf.Max(2, totalFilas)) * 0.44f, 88f, 115f);
         rect.sizeDelta = new Vector2(anchoTarjeta, altoTarjeta);
 
-        // Distribución horizontal equitativa dentro de los márgenes de SpawnArea (nunca se desborda a los lados)
         float xPos = 0f;
         if (totalEnFila == 1)
         {
@@ -330,7 +380,6 @@ public class ProceduralLevelGenerator : MonoBehaviour
             xPos = Mathf.Lerp(minX, maxX, t);
         }
 
-        // Distribución vertical equitativa dentro de los márgenes superior e inferior de SpawnArea
         int filaIndice = filaVisualOverride >= 0 ? filaVisualOverride : (int)nivel;
         float margenVertical = (altoTarjeta * 0.5f) + 18f;
         float topY = (areaHeight * 0.5f) - margenVertical;
@@ -361,6 +410,7 @@ public class ProceduralLevelGenerator : MonoBehaviour
         dataNodo.departamento = depto;
         dataNodo.isRootNode = esRaiz;
         dataNodo.maxDirectReports = maxReportes;
+        dataNodo.isStaffNode = (depto == Departamento.StaffAsesoria);
 
         Color colorTarjeta = ObtenerColorArea(depto);
         dataNodo.ConfigureVisuals(nombre, colorTarjeta);
@@ -377,6 +427,7 @@ public class ProceduralLevelGenerator : MonoBehaviour
             case Departamento.Comercial: return new Color(0.64f, 0.82f, 1.0f);
             case Departamento.Operaciones: return new Color(1.0f, 0.82f, 0.60f);
             case Departamento.Tecnologia: return new Color(0.88f, 0.72f, 1.0f);
+            case Departamento.StaffAsesoria: return new Color(0.96f, 0.86f, 0.42f);
             default: return Color.white;
         }
     }

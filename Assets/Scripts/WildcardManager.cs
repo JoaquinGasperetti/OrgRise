@@ -2,9 +2,15 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
+/// <summary>
+/// Gestiona la disponibilidad, consumo y persistencia de los Comodines de Reestructuración.
+/// Permite desbloquear el movimiento de mandos con personal a cargo o adquirir más mediante anuncios bonificados.
+/// </summary>
 public class WildcardManager : MonoBehaviour
 {
     public static WildcardManager Instance;
+
+    private const string PrefsKeyWildcards = "OrgRise_WildcardsDisponibles";
 
     [Header("Estado")]
     public int wildcardsDisponibles = 2;
@@ -20,8 +26,26 @@ public class WildcardManager : MonoBehaviour
 
     void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance == null)
+        {
+            Instance = this;
+            CargarPersistenciaComodines();
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private void CargarPersistenciaComodines()
+    {
+        wildcardsDisponibles = PlayerPrefs.GetInt(PrefsKeyWildcards, 2);
+    }
+
+    private void GuardarPersistenciaComodines()
+    {
+        PlayerPrefs.SetInt(PrefsKeyWildcards, wildcardsDisponibles);
+        PlayerPrefs.Save();
     }
 
     void Start()
@@ -203,17 +227,27 @@ public class WildcardManager : MonoBehaviour
     {
         wildcardsDisponibles = Mathf.Max(0, wildcardsDisponibles - 1);
         comodinActivo = false;
+        GuardarPersistenciaComodines();
         ActualizarUI();
     }
 
     public void RecompensarComodin(int cantidad)
     {
         wildcardsDisponibles += cantidad;
+        GuardarPersistenciaComodines();
         ActualizarUI();
         if (LevelManager.Instance != null)
         {
             LevelManager.Instance.ActualizarBadgeMenu();
         }
+    }
+
+    public void RestablecerComodinesPorDefecto()
+    {
+        wildcardsDisponibles = 2;
+        comodinActivo = false;
+        GuardarPersistenciaComodines();
+        ActualizarUI();
     }
 
     private void ActualizarUI()

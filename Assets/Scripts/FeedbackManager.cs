@@ -9,10 +9,17 @@ public class FeedbackManager : MonoBehaviour
 {
     public static FeedbackManager Instance;
 
+    public const string PrefsKeySFX = "OrgRise_SFX_Enabled";
+    public const string PrefsKeyBGM = "OrgRise_BGM_Enabled";
+    public const string PrefsKeyHaptics = "OrgRise_Haptics_Enabled";
+
     [Header("Audio")]
     public AudioClip snapSound;
     public AudioClip victorySound;
+    public AudioClip backgroundMusicClip;
+
     private AudioSource audioSource;
+    private AudioSource bgmAudioSource;
 
     private GameObject toastObject;
     private TextMeshProUGUI toastText;
@@ -25,15 +32,78 @@ public class FeedbackManager : MonoBehaviour
         else Destroy(gameObject);
 
         audioSource = GetComponent<AudioSource>();
+        ConfigurarBGM();
+    }
+
+    private void ConfigurarBGM()
+    {
+        bgmAudioSource = gameObject.AddComponent<AudioSource>();
+        bgmAudioSource.loop = true;
+        bgmAudioSource.volume = 0.28f;
+        bgmAudioSource.playOnAwake = false;
+
+        if (backgroundMusicClip != null && IsBGMEnabled())
+        {
+            bgmAudioSource.clip = backgroundMusicClip;
+            bgmAudioSource.Play();
+        }
+    }
+
+    public bool IsSFXEnabled() => PlayerPrefs.GetInt(PrefsKeySFX, 1) == 1;
+    public bool IsBGMEnabled() => PlayerPrefs.GetInt(PrefsKeyBGM, 1) == 1;
+    public bool IsHapticsEnabled() => PlayerPrefs.GetInt(PrefsKeyHaptics, 1) == 1;
+
+    public void SetSFXEnabled(bool enabled)
+    {
+        PlayerPrefs.SetInt(PrefsKeySFX, enabled ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    public void SetBGMEnabled(bool enabled)
+    {
+        PlayerPrefs.SetInt(PrefsKeyBGM, enabled ? 1 : 0);
+        PlayerPrefs.Save();
+        if (bgmAudioSource != null)
+        {
+            if (enabled && backgroundMusicClip != null)
+            {
+                if (!bgmAudioSource.isPlaying) bgmAudioSource.Play();
+            }
+            else
+            {
+                bgmAudioSource.Stop();
+            }
+        }
+    }
+
+    public void SetHapticsEnabled(bool enabled)
+    {
+        PlayerPrefs.SetInt(PrefsKeyHaptics, enabled ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    public void TriggerHapticFeedback(bool error = false)
+    {
+        if (!IsHapticsEnabled()) return;
+
+        #if UNITY_ANDROID || UNITY_IOS
+        try
+        {
+            Handheld.Vibrate();
+        }
+        catch { }
+        #endif
     }
 
     public void PlaySnapFeedback(Transform nodeTransform, string mensaje = "")
     {
-        if (snapSound != null && audioSource != null)
+        if (IsSFXEnabled() && snapSound != null && audioSource != null)
         {
             audioSource.pitch = Random.Range(0.95f, 1.08f);
-            audioSource.PlayOneShot(snapSound);
+            audioSource.PlayOneShot(snapSound, 0.9f);
         }
+
+        TriggerHapticFeedback(false);
 
         if (nodeTransform != null)
         {
@@ -48,11 +118,13 @@ public class FeedbackManager : MonoBehaviour
 
     public void PlayErrorFeedback(EmployeeNode targetNode, string motivo)
     {
-        if (snapSound != null && audioSource != null)
+        if (IsSFXEnabled() && snapSound != null && audioSource != null)
         {
             audioSource.pitch = 0.65f;
             audioSource.PlayOneShot(snapSound, 0.7f);
         }
+
+        TriggerHapticFeedback(true);
 
         if (targetNode != null)
         {
@@ -67,11 +139,13 @@ public class FeedbackManager : MonoBehaviour
 
     public void PlayVictoryFeedback(List<EmployeeNode> nodes)
     {
-        if (victorySound != null && audioSource != null)
+        if (IsSFXEnabled() && victorySound != null && audioSource != null)
         {
             audioSource.pitch = 1.0f;
-            audioSource.PlayOneShot(victorySound);
+            audioSource.PlayOneShot(victorySound, 1.0f);
         }
+
+        TriggerHapticFeedback(false);
         StartCoroutine(AnimateNodesSequentially(nodes));
     }
 
@@ -94,7 +168,6 @@ public class FeedbackManager : MonoBehaviour
         toastObject = new GameObject("AcademicToastBanner", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         toastObject.transform.SetParent(mainCanvas.transform, false);
 
-        // Anclado entre 7.2% y 13.2% de altura: arriba del Banner inferior de AdMob (0%-6.5%) y debajo del botón Comodín (13.8%-19.2%)
         RectTransform rt = toastObject.GetComponent<RectTransform>();
         rt.localScale = Vector3.one;
         rt.anchorMin = new Vector2(0.03f, 0.072f);

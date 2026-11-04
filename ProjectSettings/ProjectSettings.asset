@@ -12,7 +12,7 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: HKemtrentainment
+  companyName: HK Entertainment
   productName: OrgRise
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
@@ -167,8 +167,9 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.HKemtrentainment.OrgRise
-    Standalone: com.DefaultCompany.2D-URP
+    Android: com.hkentertainment.orgrise
+    iPhone: com.hkentertainment.orgrise
+    Standalone: com.hkentertainment.orgrise
   buildNumber:
     Standalone: 0
     VisionOS: 0

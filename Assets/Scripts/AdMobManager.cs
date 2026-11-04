@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 using GoogleMobileAds.Api;
 using GoogleMobileAds.Common;
+using GoogleMobileAds.Ump.Api;
 
 /// <summary>
 /// Gestor centralizado de Google AdMob (Google Mobile Ads Unity Plugin v11.6.0).
@@ -21,6 +22,23 @@ public class AdMobManager : MonoBehaviour
 
     [Header("ID de Aplicación AdMob")]
     public string appId = "ca-app-pub-2266949018056491~8163314986";
+
+    [Header("Modo de Seguridad y Desarrollo")]
+    [Tooltip("Si está activo, utiliza los bloques de anuncio de prueba oficiales de Google para evitar suspensiones por tráfico inválido.")]
+    public bool modoPruebas = true;
+
+    // IDs de prueba oficiales de Google AdMob para desarrollo seguro
+    private const string TestBannerId = "ca-app-pub-3940256099942544/6300978111";
+    private const string TestInterstitialId = "ca-app-pub-3940256099942544/1033173712";
+    private const string TestRewardedId = "ca-app-pub-3940256099942544/5224354917";
+    private const string TestRewardedInterstitialId = "ca-app-pub-3940256099942544/5354046379";
+    private const string TestAppOpenId = "ca-app-pub-3940256099942544/9257395921";
+
+    public string BannerId => (modoPruebas || Application.isEditor || Debug.isDebugBuild) ? TestBannerId : bannerAdUnitId;
+    public string InterstitialId => (modoPruebas || Application.isEditor || Debug.isDebugBuild) ? TestInterstitialId : interstitialAdUnitId;
+    public string RewardedId => (modoPruebas || Application.isEditor || Debug.isDebugBuild) ? TestRewardedId : rewardedAdUnitId;
+    public string RewardedInterstitialId => (modoPruebas || Application.isEditor || Debug.isDebugBuild) ? TestRewardedInterstitialId : rewardedInterstitialAdUnitId;
+    public string AppOpenId => (modoPruebas || Application.isEditor || Debug.isDebugBuild) ? TestAppOpenId : appOpenAdUnitId;
 
     [Header("IDs de Bloques de Anuncios (Producción)")]
     public string bannerAdUnitId = "ca-app-pub-2266949018056491/9799830280";
@@ -115,7 +133,59 @@ public class AdMobManager : MonoBehaviour
         // Suscribirse a cambios de estado de la app (Foreground/Background) para el bloque "Carga de aplicación" (App Open Ad)
         AppStateEventNotifier.AppStateChanged += OnAppStateChanged;
 
-        // Inicializar Google Mobile Ads SDK v11.6.0
+        SolicitarConsentimientoUMPeInicializar();
+    }
+
+    private void SolicitarConsentimientoUMPeInicializar()
+    {
+        ConsentRequestParameters request = new ConsentRequestParameters();
+
+        ConsentInformation.Update(request, (FormError error) =>
+        {
+            if (error != null)
+            {
+                Debug.LogWarning("[AdMob UMP] Error al actualizar consentimiento: " + error.Message);
+                InicializarSDKAdMob();
+                return;
+            }
+
+            ConsentForm.LoadAndShowConsentFormIfRequired((FormError formError) =>
+            {
+                if (formError != null)
+                {
+                    Debug.LogWarning("[AdMob UMP] Error al mostrar formulario de consentimiento: " + formError.Message);
+                }
+
+                if (ConsentInformation.CanRequestAds())
+                {
+                    InicializarSDKAdMob();
+                }
+            });
+        });
+
+        if (ConsentInformation.CanRequestAds())
+        {
+            InicializarSDKAdMob();
+        }
+    }
+
+    private void InicializarSDKAdMob()
+    {
+        if (sdkInicializado) return;
+
+        if (modoPruebas || Application.isEditor || Debug.isDebugBuild)
+        {
+            RequestConfiguration requestConfiguration = new RequestConfiguration
+            {
+                TestDeviceIds = new System.Collections.Generic.List<string>
+                {
+                    AdRequest.TestDeviceSimulator
+                }
+            };
+            MobileAds.SetRequestConfiguration(requestConfiguration);
+            Debug.Log("[AdMob] Modo pruebas activo: utilizando bloques y configuración segura de prueba.");
+        }
+
         MobileAds.Initialize((InitializationStatus initStatus) =>
         {
             sdkInicializado = true;
@@ -421,7 +491,7 @@ public class AdMobManager : MonoBehaviour
         // Usamos Anchored Adaptive Banner de ancho completo (AdSize.FullWidth) según la orientación actual,
         // que se adapta automáticamente al ancho exacto de cualquier teléfono o tablet.
         AdSize adaptiveSize = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
-        bannerView = new BannerView(bannerAdUnitId, adaptiveSize, AdPosition.Bottom);
+        bannerView = new BannerView(BannerId, adaptiveSize, AdPosition.Bottom);
 
         bannerView.OnBannerAdLoaded += () =>
         {
@@ -573,7 +643,7 @@ public class AdMobManager : MonoBehaviour
             appOpenAd = null;
         }
 
-        AppOpenAd.Load(appOpenAdUnitId, new AdRequest(), (AppOpenAd ad, LoadAdError error) =>
+        AppOpenAd.Load(AppOpenId, new AdRequest(), (AppOpenAd ad, LoadAdError error) =>
         {
             if (error != null || ad == null)
             {
@@ -677,7 +747,7 @@ public class AdMobManager : MonoBehaviour
             interstitialAd = null;
         }
 
-        InterstitialAd.Load(interstitialAdUnitId, new AdRequest(), (InterstitialAd ad, LoadAdError error) =>
+        InterstitialAd.Load(InterstitialId, new AdRequest(), (InterstitialAd ad, LoadAdError error) =>
         {
             if (error != null || ad == null)
             {
@@ -764,7 +834,7 @@ public class AdMobManager : MonoBehaviour
             rewardedInterstitialAd = null;
         }
 
-        RewardedInterstitialAd.Load(rewardedInterstitialAdUnitId, new AdRequest(), (RewardedInterstitialAd ad, LoadAdError error) =>
+        RewardedInterstitialAd.Load(RewardedInterstitialId, new AdRequest(), (RewardedInterstitialAd ad, LoadAdError error) =>
         {
             if (error != null || ad == null)
             {
@@ -1093,7 +1163,7 @@ public class AdMobManager : MonoBehaviour
             rewardedAd = null;
         }
 
-        RewardedAd.Load(rewardedAdUnitId, new AdRequest(), (RewardedAd ad, LoadAdError error) =>
+        RewardedAd.Load(RewardedId, new AdRequest(), (RewardedAd ad, LoadAdError error) =>
         {
             if (error != null || ad == null)
             {

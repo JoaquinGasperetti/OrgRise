@@ -14,6 +14,7 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
     private RectTransform tempLine; // Línea que se dibuja al arrastrar
 
     [HideInInspector] public GameObject currentManagerLine;
+    [HideInInspector] public GameObject currentMatrixLine;
 
     void Awake()
     {
@@ -33,7 +34,27 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void TryDisconnectFromManager()
     {
-        if (myNode == null || myNode.manager == null) return;
+        if (myNode == null) return;
+
+        // Si tiene conexión matricial activa y se solicita desconexión, removemos la matricial primero
+        if (myNode.matrixProjectManager != null)
+        {
+            string exMatrixJefe = myNode.matrixProjectManager.roleName;
+            myNode.RemoveMatrixProjectManager();
+            if (currentMatrixLine != null)
+            {
+                Destroy(currentMatrixLine);
+                currentMatrixLine = null;
+            }
+
+            if (FeedbackManager.Instance != null)
+            {
+                FeedbackManager.Instance.PlaySnapFeedback(transform, $"Desconectado: {myNode.roleName} liberó su reporte matricial con {exMatrixJefe}.");
+            }
+            return;
+        }
+
+        if (myNode.manager == null) return;
 
         bool tieneSubordinados = myNode.directReports.Count > 0;
         bool comodinListo = WildcardManager.Instance != null && WildcardManager.Instance.comodinActivo;
@@ -48,6 +69,7 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
         }
 
         string exJefe = myNode.manager.roleName;
+        EmployeeNode prevMgr = myNode.manager;
         myNode.RemoveCurrentManager();
 
         if (currentManagerLine != null)
@@ -56,9 +78,16 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
             currentManagerLine = null;
         }
 
+        bool comodinConsumido = false;
         if (tieneSubordinados && comodinListo && WildcardManager.Instance != null)
         {
             WildcardManager.Instance.ConsumirComodin();
+            comodinConsumido = true;
+        }
+
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.RegistrarAccionDesconexion(myNode, prevMgr, comodinConsumido);
         }
 
         if (FeedbackManager.Instance != null)
@@ -113,7 +142,6 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
         if (nodeA == null || nodeB == null) return;
 
         // Determinamos automáticamente quién es el subordinado y quién es el superior según su nivel jerárquico
-        // para que el jugador pueda arrastrar tanto de subordinado->jefe como de jefe->subordinado
         EmployeeNode subordinateNode = nodeA;
         EmployeeNode managerNode = nodeB;
         UINodeInteraction subordinateUI = draggedNodeUI;
@@ -127,7 +155,7 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
             managerUI = draggedNodeUI;
         }
 
-        // Restricción de reestructuración: si el subordinado que cambia de jefe ya tiene gente a cargo y ya tenía un jefe asignado (o se mueve en bloque)
+        // Restricción de reestructuración: si el subordinado que cambia de jefe ya tiene gente a cargo y ya tenía un jefe asignado
         bool requiereComodin = subordinateNode.directReports.Count > 0 && subordinateNode.manager != null;
         bool comodinActivo = WildcardManager.Instance != null && WildcardManager.Instance.comodinActivo;
 
@@ -140,13 +168,10 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
             return;
         }
 
-        if (subordinateNode.TryAssignManager(managerNode, out string motivoRechazo))
-        {
-            if (subordinateUI.currentManagerLine != null)
-            {
-                Destroy(subordinateUI.currentManagerLine);
-            }
+        EmployeeNode prevManager = subordinateNode.manager;
 
+        if (subordinateNode.TryAssignManager(managerNode, out string motivoRechazo, out bool esConexionMatricial))
+        {
             Transform lineParent = transform.parent != null ? transform.parent : canvas.transform;
             GameObject permLine = Instantiate(linePrefab, lineParent);
             permLine.transform.SetAsFirstSibling();
@@ -156,22 +181,50 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
             lineLogic.startNode = managerUI.myRect;
             lineLogic.endNode = subordinateUI.myRect;
-            lineLogic.SetLineColor(new Color(0.18f, 0.32f, 0.48f, 0.95f));
+
+            if (esConexionMatricial)
+            {
+                lineLogic.SetMatrixStyle(true);
+                if (subordinateUI.currentMatrixLine != null) Destroy(subordinateUI.currentMatrixLine);
+                subordinateUI.currentMatrixLine = permLine;
+            }
+            else
+            {
+                if (subordinateNode.isStaffNode)
+                {
+                    lineLogic.SetStaffStyle(true);
+                }
+                else
+                {
+                    lineLogic.SetLineColor(new Color(0.18f, 0.32f, 0.48f, 0.95f));
+                }
+
+                if (subordinateUI.currentManagerLine != null) Destroy(subordinateUI.currentManagerLine);
+                subordinateUI.currentManagerLine = permLine;
+            }
+
             lineLogic.UpdateGeometry(managerUI.myRect.position, subordinateUI.myRect.position);
 
-            subordinateUI.currentManagerLine = permLine;
-
             // Consumir comodín si se reestructuró una rama activa
+            bool comodinConsumido = false;
             if (subordinateNode.directReports.Count > 0 && comodinActivo && WildcardManager.Instance != null)
             {
                 WildcardManager.Instance.ConsumirComodin();
+                comodinConsumido = true;
+            }
+
+            // Registrar acción para Deshacer (Undo)
+            if (LevelManager.Instance != null)
+            {
+                LevelManager.Instance.RegistrarAccionConexion(subordinateNode, prevManager, managerNode, esConexionMatricial, comodinConsumido);
             }
 
             if (FeedbackManager.Instance != null)
             {
+                string tipoReporte = esConexionMatricial ? "Reporte Matricial (Transversal)" : (subordinateNode.isStaffNode ? "Asesoría Staff" : "Cadena de Mando");
                 FeedbackManager.Instance.PlaySnapFeedback(
                     managerUI.transform,
-                    $"✓ Cadena de mando: {subordinateNode.roleName} → {managerNode.roleName} (Tramo: {managerNode.directReports.Count}/{managerNode.maxDirectReports})"
+                    $"✓ {tipoReporte}: {subordinateNode.roleName} → {managerNode.roleName} (Tramo: {managerNode.directReports.Count}/{managerNode.maxDirectReports})"
                 );
             }
 
@@ -192,6 +245,60 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
                 FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, motivoRechazo);
             }
         }
+    }
+
+    public void DestruirLineas()
+    {
+        if (currentManagerLine != null)
+        {
+            Destroy(currentManagerLine);
+            currentManagerLine = null;
+        }
+        if (currentMatrixLine != null)
+        {
+            Destroy(currentMatrixLine);
+            currentMatrixLine = null;
+        }
+    }
+
+    public void RecrearLinea(EmployeeNode targetManager, bool esMatricial)
+    {
+        if (targetManager == null || linePrefab == null) return;
+
+        UINodeInteraction mgrUI = targetManager.GetComponent<UINodeInteraction>();
+        if (mgrUI == null) return;
+
+        Transform lineParent = transform.parent != null ? transform.parent : (canvas != null ? canvas.transform : transform);
+        GameObject permLine = Instantiate(linePrefab, lineParent);
+        permLine.transform.SetAsFirstSibling();
+
+        UILineConnection lineLogic = permLine.GetComponent<UILineConnection>();
+        if (lineLogic == null) lineLogic = permLine.AddComponent<UILineConnection>();
+
+        lineLogic.startNode = mgrUI.myRect;
+        lineLogic.endNode = this.myRect;
+
+        if (esMatricial)
+        {
+            lineLogic.SetMatrixStyle(true);
+            if (currentMatrixLine != null) Destroy(currentMatrixLine);
+            currentMatrixLine = permLine;
+        }
+        else
+        {
+            if (myNode != null && myNode.isStaffNode)
+            {
+                lineLogic.SetStaffStyle(true);
+            }
+            else
+            {
+                lineLogic.SetLineColor(new Color(0.18f, 0.32f, 0.48f, 0.95f));
+            }
+            if (currentManagerLine != null) Destroy(currentManagerLine);
+            currentManagerLine = permLine;
+        }
+
+        lineLogic.UpdateGeometry(mgrUI.myRect.position, this.myRect.position);
     }
 
     private void UpdateLineVisuals(Vector2 screenPointerPos)
