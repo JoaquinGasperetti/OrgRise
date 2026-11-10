@@ -8,13 +8,13 @@ using GoogleMobileAds.Common;
 using GoogleMobileAds.Ump.Api;
 
 /// <summary>
-/// Gestor centralizado de Google AdMob (Google Mobile Ads Unity Plugin v11.6.0).
-/// Incluye adaptación responsiva automática para todas las resoluciones y relaciones de aspecto
-/// (16:9, 18:9, 19.5:9, 20:9, 4:3 tablets y ventana libre del Editor):
-/// - Usa Anchored Adaptive Banner (FullWidth) para que el banner se ajuste al 100% del ancho de cualquier pantalla.
-/// - Reajusta dinámicamente los Canvas de anuncios (tanto en dispositivo como los PlaceholderAds del Editor)
-///   para evitar que los anuncios de pantalla completa, el botón "Close Ad", el contador o el banner se corten o desborden.
-/// - Recalcula automáticamente los anuncios si cambia la resolución o el aspecto de la pantalla en tiempo real.
+/// Gestor Comercial de Monetización Google AdMob (v11.6.0) optimizado para alto eCPM y retención en Play Store.
+/// Soporta los 5 formatos de ingresos:
+/// 1. Anchored Adaptive Banner (siempre visible en zona segura inferior).
+/// 2. App Open Ad (apertura en frío y regreso desde segundo plano).
+/// 3. Intersticial Estándar (en transiciones naturales con frecuencia legal AdMob).
+/// 4. Intersticial Bonificado (en cambio de nivel con modal opt-out vectorial de alta conversión).
+/// 5. Video Bonificado Opt-In (para Auto-Pista Headhunter, Mejora a 3⭐, Salva-Racha y Recarga de Comodines).
 /// </summary>
 public class AdMobManager : MonoBehaviour
 {
@@ -24,10 +24,9 @@ public class AdMobManager : MonoBehaviour
     public string appId = "ca-app-pub-2266949018056491~8163314986";
 
     [Header("Modo de Seguridad y Desarrollo")]
-    [Tooltip("Si está activo, utiliza los bloques de anuncio de prueba oficiales de Google para evitar suspensiones por tráfico inválido.")]
+    [Tooltip("En Play Store (Release Build), poner modoPruebas = false para servir anuncios comerciales reales.")]
     public bool modoPruebas = true;
 
-    // IDs de prueba oficiales de Google AdMob para desarrollo seguro
     private const string TestBannerId = "ca-app-pub-3940256099942544/6300978111";
     private const string TestInterstitialId = "ca-app-pub-3940256099942544/1033173712";
     private const string TestRewardedId = "ca-app-pub-3940256099942544/5224354917";
@@ -47,24 +46,17 @@ public class AdMobManager : MonoBehaviour
     public string interstitialAdUnitId = "ca-app-pub-2266949018056491/4224069973";
     public string rewardedInterstitialAdUnitId = "ca-app-pub-2266949018056491/2347434413";
 
-    [Header("Políticas de Frecuencia y Seguridad Legal (AdMob Compliance)")]
-    [Tooltip("Mínimo de acciones de transición del usuario antes de permitir un Intersticial (Política AdMob: mínimo 2).")]
+    [Header("Optimización de Frecuencia e Ingresos (AdMob Compliance)")]
     public int minAccionesParaIntersticial = 2;
-
-    [Tooltip("Tiempo mínimo en segundos entre anuncios de pantalla completa no voluntarios (Intersticial / App Open).")]
-    public float cooldownPantallaCompletaSegundos = 45f;
-
-    [Tooltip("Segundos de cuenta regresiva en el aviso previo obligatorio del Intersticial Bonificado.")]
+    public float cooldownPantallaCompletaSegundos = 35f;
     public int segundosIntroIntersticialBonificado = 4;
 
-    // Instancias del SDK v11.6.0
     private BannerView bannerView;
     private InterstitialAd interstitialAd;
     private AppOpenAd appOpenAd;
     private RewardedAd rewardedAd;
     private RewardedInterstitialAd rewardedInterstitialAd;
 
-    // Control de estado y políticas
     private bool sdkInicializado = false;
     private bool anuncioPantallaCompletaActivo = false;
     private bool mostrarAppOpenEnPrimerInicio = true;
@@ -75,12 +67,10 @@ public class AdMobManager : MonoBehaviour
     private int contadorAccionesTransicion = 0;
     private int contadorNivelesCompletados = 0;
 
-    // Seguimiento de resolución para recalcular anuncios si cambia el tamaño/aspecto de pantalla
     private int ultimoAnchoPantalla = 0;
     private int ultimoAltoPantalla = 0;
     private float alturaRelativaBannerActual = 0.068f;
 
-    // UI de franja segura para el Banner y Modal Introductorio de Intersticial Bonificado
     private GameObject bannerSafeZoneBar;
     private GameObject rewardedInterstitialPromptPanel;
     private TextMeshProUGUI promptCountdownText;
@@ -89,9 +79,6 @@ public class AdMobManager : MonoBehaviour
     private Action pendingTransitionCallback;
     private int pendingRewardAmount = 2;
 
-    /// <summary>
-    /// Garantiza que AdMobManager se cree automáticamente al iniciar la escena incluso si no fue agregado manualmente al Inspector.
-    /// </summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoBootstrap()
     {
@@ -126,11 +113,7 @@ public class AdMobManager : MonoBehaviour
         ultimoAltoPantalla = Screen.height;
 
         CrearFranjaSeguraBannerUI();
-
-        // Asegurar que todos los callbacks del SDK de AdMob se ejecuten en el hilo principal de Unity
         MobileAds.RaiseAdEventsOnUnityMainThread = true;
-
-        // Suscribirse a cambios de estado de la app (Foreground/Background) para el bloque "Carga de aplicación" (App Open Ad)
         AppStateEventNotifier.AppStateChanged += OnAppStateChanged;
 
         SolicitarConsentimientoUMPeInicializar();
@@ -144,18 +127,12 @@ public class AdMobManager : MonoBehaviour
         {
             if (error != null)
             {
-                Debug.LogWarning("[AdMob UMP] Error al actualizar consentimiento: " + error.Message);
                 InicializarSDKAdMob();
                 return;
             }
 
             ConsentForm.LoadAndShowConsentFormIfRequired((FormError formError) =>
             {
-                if (formError != null)
-                {
-                    Debug.LogWarning("[AdMob UMP] Error al mostrar formulario de consentimiento: " + formError.Message);
-                }
-
                 if (ConsentInformation.CanRequestAds())
                 {
                     InicializarSDKAdMob();
@@ -183,14 +160,11 @@ public class AdMobManager : MonoBehaviour
                 }
             };
             MobileAds.SetRequestConfiguration(requestConfiguration);
-            Debug.Log("[AdMob] Modo pruebas activo: utilizando bloques y configuración segura de prueba.");
         }
 
         MobileAds.Initialize((InitializationStatus initStatus) =>
         {
             sdkInicializado = true;
-            Debug.Log("[AdMob] SDK v11.6.0 inicializado correctamente.");
-
             CargarYMostrarBanner();
             CargarAppOpenAd();
             CargarInterstitialAd();
@@ -201,8 +175,6 @@ public class AdMobManager : MonoBehaviour
 
     void Update()
     {
-        // Si cambia la resolución o relación de aspecto (por ejemplo al cambiar de dispositivo en el simulador de Unity o rotar),
-        // reajustamos automáticamente el Banner adaptativo y cualquier anuncio activo en pantalla.
         if (Screen.width != ultimoAnchoPantalla || Screen.height != ultimoAltoPantalla)
         {
             ultimoAnchoPantalla = Screen.width;
@@ -220,7 +192,6 @@ public class AdMobManager : MonoBehaviour
             }
         }
 
-        // Mantener normalizados los Canvas de anuncios cuando hay uno visible en el Editor
         if (anuncioPantallaCompletaActivo || bannerVisible)
         {
             AjustarCanvasesDeAnunciosEnPantalla();
@@ -240,12 +211,6 @@ public class AdMobManager : MonoBehaviour
         }
     }
 
-    // =========================================================================
-    // NORMALIZADOR RESPONSIVO DE ANUNCIOS PARA TODAS LAS PANTALLAS
-    // Corrige el escalado tanto en dispositivos de distinto aspecto (16:9, 20:9,
-    // 4:3 tablets) como en los prefabs PlaceholderAds del Editor de Unity.
-    // =========================================================================
-
     public void AjustarCanvasesDeAnunciosEnPantalla()
     {
         Canvas[] todosLosCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
@@ -254,12 +219,10 @@ public class AdMobManager : MonoBehaviour
             if (c == null || c.gameObject == null) continue;
             string nombre = c.gameObject.name;
 
-            // 1. Ajuste responsivo del Banner (ADAPTIVE, BANNER, SMART_BANNER)
             if (nombre.StartsWith("ADAPTIVE") || nombre.StartsWith("BANNER") || nombre.StartsWith("SMART_BANNER") || nombre.StartsWith("LARGE_BANNER") || nombre.StartsWith("FULL_BANNER"))
             {
                 NormalizarCanvasBanner(c);
             }
-            // 2. Ajuste responsivo de anuncios de pantalla completa (Intersticial, AppOpen, Bonificado, Intersticial Bonificado)
             else if (nombre.StartsWith("768x1024") || nombre.StartsWith("1024x768"))
             {
                 NormalizarCanvasPantallaCompleta(c);
@@ -282,7 +245,6 @@ public class AdMobManager : MonoBehaviour
             scaler.matchWidthOrHeight = 0.5f;
         }
 
-        // Buscar el objeto hijo "Image" que representa el contenedor del banner
         Transform imgTransform = bannerCanvas.transform.Find("Image");
         if (imgTransform == null && bannerCanvas.transform.childCount > 0)
         {
@@ -294,7 +256,6 @@ public class AdMobManager : MonoBehaviour
             RectTransform rt = imgTransform.GetComponent<RectTransform>();
             if (rt != null)
             {
-                // Respetar SafeArea inferior del teléfono (barra gestual en iOS/Android modernos)
                 float safeBottomRatio = Screen.height > 0 ? Mathf.Clamp01(Screen.safeArea.yMin / Screen.height) : 0f;
                 float bannerHeightRatio = 0.062f;
                 alturaRelativaBannerActual = Mathf.Clamp(safeBottomRatio + bannerHeightRatio, 0.065f, 0.10f);
@@ -310,12 +271,8 @@ public class AdMobManager : MonoBehaviour
             }
 
             Image img = imgTransform.GetComponent<Image>();
-            if (img != null)
-            {
-                img.preserveAspect = false;
-            }
+            if (img != null) img.preserveAspect = false;
 
-            // Ajustar el texto interno si existe ("This is a Test Adaptive Banner")
             Text legacyText = imgTransform.GetComponentInChildren<Text>(true);
             if (legacyText != null)
             {
@@ -355,7 +312,6 @@ public class AdMobManager : MonoBehaviour
             scaler.matchWidthOrHeight = 0.5f;
         }
 
-        // 1. Asegurar que el fondo oscuro cubra el 100% de cualquier pantalla
         Transform bgTransform = fullScreenCanvas.transform.Find("Background");
         if (bgTransform != null)
         {
@@ -371,14 +327,9 @@ public class AdMobManager : MonoBehaviour
                 bgRt.offsetMax = Vector2.zero;
             }
             Image bgImg = bgTransform.GetComponent<Image>();
-            if (bgImg != null)
-            {
-                bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.94f);
-            }
+            if (bgImg != null) bgImg.color = new Color(0.02f, 0.04f, 0.08f, 0.94f);
         }
 
-        // 2. Ajustar el contenedor "Ad" con anclas relativas dentro del SafeArea para que NUNCA se desborde
-        // ni en pantallas 20:9, ni en 16:9, ni en 4:3 tablets, ni en ventana libre del Editor
         Transform adTransform = fullScreenCanvas.transform.Find("Ad");
         if (adTransform != null)
         {
@@ -400,7 +351,6 @@ public class AdMobManager : MonoBehaviour
                 adRt.offsetMax = Vector2.zero;
             }
 
-            // 3. Ajustar el botón "Close Ad" en la esquina superior izquierda/derecha dentro del contenedor
             Transform btnTransform = adTransform.Find("Button");
             if (btnTransform != null)
             {
@@ -438,7 +388,6 @@ public class AdMobManager : MonoBehaviour
                 }
             }
 
-            // 4. Ajustar el contador "5 second(s) remaining" de los anuncios bonificados para que nunca se corte
             for (int i = 0; i < adTransform.childCount; i++)
             {
                 Transform child = adTransform.GetChild(i);
@@ -470,12 +419,6 @@ public class AdMobManager : MonoBehaviour
         }
     }
 
-    // =========================================================================
-    // 1. BANNER ADAPTATIVO (ca-app-pub-2266949018056491/9799830280)
-    // Política AdMob: 1 solo banner fijo en el borde inferior, usando
-    // Anchored Adaptive Banner (FullWidth) para ajustarse a cualquier pantalla.
-    // =========================================================================
-
     public void CargarYMostrarBanner()
     {
         if (!sdkInicializado) return;
@@ -488,8 +431,6 @@ public class AdMobManager : MonoBehaviour
             bannerView = null;
         }
 
-        // Usamos Anchored Adaptive Banner de ancho completo (AdSize.FullWidth) según la orientación actual,
-        // que se adapta automáticamente al ancho exacto de cualquier teléfono o tablet.
         AdSize adaptiveSize = AdSize.GetCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(AdSize.FullWidth);
         bannerView = new BannerView(BannerId, adaptiveSize, AdPosition.Bottom);
 
@@ -498,13 +439,11 @@ public class AdMobManager : MonoBehaviour
             bannerVisible = true;
             AjustarCanvasesDeAnunciosEnPantalla();
             ActualizarDimensionFranjaSegura();
-            Debug.Log($"[AdMob] Adaptive Banner cargado ({bannerView.GetWidthInPixels()}x{bannerView.GetHeightInPixels()} px) en AdPosition.Bottom.");
         };
 
         bannerView.OnBannerAdLoadFailed += (LoadAdError error) =>
         {
             bannerVisible = false;
-            Debug.LogWarning($"[AdMob] Error al cargar Banner: {error}");
         };
 
         bannerView.LoadAd(new AdRequest());
@@ -540,10 +479,6 @@ public class AdMobManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Crea y actualiza el zócalo reservado en el borde inferior del Canvas
-    /// calculando su altura según el tamaño real del Adaptive Banner y el SafeArea del dispositivo.
-    /// </summary>
     public void CrearFranjaSeguraBannerUI()
     {
         if (bannerSafeZoneBar == null)
@@ -556,7 +491,7 @@ public class AdMobManager : MonoBehaviour
             bannerSafeZoneBar.transform.SetAsLastSibling();
 
             Image bg = bannerSafeZoneBar.GetComponent<Image>();
-            bg.color = new Color(0.03f, 0.05f, 0.08f, 0.98f);
+            bg.color = new Color(0.03f, 0.05f, 0.09f, 0.98f);
             bg.raycastTarget = true;
 
             GameObject borderLine = new GameObject("SafeBorderLine", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -569,7 +504,7 @@ public class AdMobManager : MonoBehaviour
             lineRt.offsetMax = Vector2.zero;
 
             Image lineImg = borderLine.GetComponent<Image>();
-            lineImg.color = new Color(0.22f, 0.30f, 0.42f, 0.85f);
+            lineImg.color = new Color(0.22f, 0.34f, 0.52f, 0.85f);
             lineImg.raycastTarget = false;
 
             GameObject labelObj = new GameObject("SafeZoneLabel", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -582,12 +517,12 @@ public class AdMobManager : MonoBehaviour
             lblRt.offsetMax = Vector2.zero;
 
             TextMeshProUGUI tmp = labelObj.GetComponent<TextMeshProUGUI>();
-            tmp.text = "ESPACIO PUBLICITARIO ADAPTATIVO (ADMOB)";
+            tmp.text = "ESPACIO PUBLICITARIO ADAPTATIVO";
             tmp.fontSizeMin = 9f;
             tmp.fontSizeMax = 14f;
             tmp.enableAutoSizing = true;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = new Color(0.45f, 0.52f, 0.62f, 0.65f);
+            tmp.color = new Color(0.45f, 0.52f, 0.62f, 0.55f);
             tmp.raycastTarget = false;
         }
 
@@ -627,12 +562,6 @@ public class AdMobManager : MonoBehaviour
         return Mathf.Clamp(alturaRelativaBannerActual, 0.065f, 0.105f);
     }
 
-    // =========================================================================
-    // 2. CARGA DE APLICACIÓN / APP OPEN (ca-app-pub-2266949018056491/6383329457)
-    // Política AdMob: Solo al abrir la aplicación o al regresar desde segundo plano.
-    // Expiración máxima de caché: 4 horas.
-    // =========================================================================
-
     public void CargarAppOpenAd()
     {
         if (!sdkInicializado) return;
@@ -645,16 +574,11 @@ public class AdMobManager : MonoBehaviour
 
         AppOpenAd.Load(AppOpenId, new AdRequest(), (AppOpenAd ad, LoadAdError error) =>
         {
-            if (error != null || ad == null)
-            {
-                Debug.LogWarning($"[AdMob] Error al pre-cargar AppOpenAd: {error}");
-                return;
-            }
+            if (error != null || ad == null) return;
 
             appOpenAd = ad;
             appOpenHoraCarga = DateTime.UtcNow;
             RegistrarEventosAppOpen(appOpenAd);
-            Debug.Log("[AdMob] AppOpenAd (Carga de aplicación) listo.");
 
             if (mostrarAppOpenEnPrimerInicio && Time.realtimeSinceStartup < 12f && !anuncioPantallaCompletaActivo)
             {
@@ -675,11 +599,7 @@ public class AdMobManager : MonoBehaviour
     {
         if (state == AppState.Foreground)
         {
-            if (Time.realtimeSinceStartup - ultimoCierrePantallaCompletaTiempo < 5f)
-            {
-                return;
-            }
-
+            if (Time.realtimeSinceStartup - ultimoCierrePantallaCompletaTiempo < 5f) return;
             MostrarAppOpenAdSiDisponible();
         }
     }
@@ -687,11 +607,7 @@ public class AdMobManager : MonoBehaviour
     public void MostrarAppOpenAdSiDisponible()
     {
         if (anuncioPantallaCompletaActivo) return;
-
-        if (Time.realtimeSinceStartup - ultimoAnuncioPantallaCompletaTiempo < cooldownPantallaCompletaSegundos)
-        {
-            return;
-        }
+        if (Time.realtimeSinceStartup - ultimoAnuncioPantallaCompletaTiempo < cooldownPantallaCompletaSegundos) return;
 
         if (!EsAppOpenAdValido())
         {
@@ -731,12 +647,6 @@ public class AdMobManager : MonoBehaviour
         };
     }
 
-    // =========================================================================
-    // 3. INTERSTICIAL (ca-app-pub-2266949018056491/4224069973)
-    // Política AdMob: Solo en pausas/transiciones naturales, pre-cargado antes
-    // de cambiar de pantalla, y NUNCA más de 1 cada 2 acciones del usuario.
-    // =========================================================================
-
     public void CargarInterstitialAd()
     {
         if (!sdkInicializado) return;
@@ -749,14 +659,8 @@ public class AdMobManager : MonoBehaviour
 
         InterstitialAd.Load(InterstitialId, new AdRequest(), (InterstitialAd ad, LoadAdError error) =>
         {
-            if (error != null || ad == null)
-            {
-                Debug.LogWarning($"[AdMob] Error al pre-cargar InterstitialAd: {error}");
-                return;
-            }
-
+            if (error != null || ad == null) return;
             interstitialAd = ad;
-            Debug.Log("[AdMob] InterstitialAd pre-cargado y listo.");
         });
     }
 
@@ -818,12 +722,6 @@ public class AdMobManager : MonoBehaviour
         }
     }
 
-    // =========================================================================
-    // 4. INTERSTICIAL BONIFICADO (ca-app-pub-2266949018056491/2347434413)
-    // Política AdMob: Aparece en transiciones naturales (ej. al completar un nivel),
-    // pero EXIGE una pantalla previa con opción clara de "No, gracias / Omitir".
-    // =========================================================================
-
     public void CargarRewardedInterstitialAd()
     {
         if (!sdkInicializado) return;
@@ -836,14 +734,8 @@ public class AdMobManager : MonoBehaviour
 
         RewardedInterstitialAd.Load(RewardedInterstitialId, new AdRequest(), (RewardedInterstitialAd ad, LoadAdError error) =>
         {
-            if (error != null || ad == null)
-            {
-                Debug.LogWarning($"[AdMob] Error al pre-cargar RewardedInterstitialAd: {error}");
-                return;
-            }
-
+            if (error != null || ad == null) return;
             rewardedInterstitialAd = ad;
-            Debug.Log("[AdMob] RewardedInterstitialAd (Intersticial bonificado) listo.");
         });
     }
 
@@ -885,9 +777,9 @@ public class AdMobManager : MonoBehaviour
         if (promptBodyText != null)
         {
             promptBodyText.text =
-                "<b>🎁 BONIFICACIÓN DE REESTRUCTURACIÓN</b>\n\n" +
-                $"Mirando un breve anuncio antes del próximo nivel recibirás automáticamente <b>+{cantidadComodines} Comodines de Reestructuración (⚡)</b>.\n\n" +
-                "<size=80%><color=#B0BEC5>Podés cancelar en cualquier momento tocando \"No, gracias\" sin afectar tu partida.</color></size>";
+                "<b>🎁 BONO DE INVERSIÓN CORPORATIVA</b>\n\n" +
+                $"Mirando un breve anuncio antes del próximo nivel recibirás automáticamente <b>+{cantidadComodines} ⚡ Comodines de Reestructuración</b>.\n\n" +
+                "<size=80%><color=#B0BEC5>Podés omitirlo tocando \"No, gracias\" sin afectar tu partida.</color></size>";
         }
 
         if (promptCountdownCoroutine != null) StopCoroutine(promptCountdownCoroutine);
@@ -958,8 +850,8 @@ public class AdMobManager : MonoBehaviour
                 if (recompensaEntregada && FeedbackManager.Instance != null)
                 {
                     FeedbackManager.Instance.MostrarMensajeEstado(
-                        $"🎁 ¡Bono acreditado! Recibiste +{recompensa} Comodines de Reestructuración.",
-                        new Color(0.15f, 0.50f, 0.30f, 0.96f),
+                        $"🎁 ¡Bono acreditado! Recibiste +{recompensa} ⚡ Comodines.",
+                        new Color(0.10f, 0.50f, 0.32f, 0.96f),
                         3.0f
                     );
                 }
@@ -1045,7 +937,8 @@ public class AdMobManager : MonoBehaviour
         cardRt.offsetMax = Vector2.zero;
 
         Image cardBg = card.GetComponent<Image>();
-        cardBg.color = new Color(0.10f, 0.15f, 0.23f, 1f);
+        VectorUIKit.ApplyRoundedStyle(cardBg, new Color(0.10f, 0.15f, 0.24f, 1f), pill: false, addShadow: true);
+        VectorUIKit.ApplyOutline(cardBg, VectorUIKit.AccentGold, 1.8f);
 
         GameObject bodyObj = new GameObject("PromptBody", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         bodyObj.transform.SetParent(card.transform, false);
@@ -1075,7 +968,7 @@ public class AdMobManager : MonoBehaviour
         promptCountdownText = countObj.GetComponent<TextMeshProUGUI>();
         promptCountdownText.alignment = TextAlignmentOptions.Center;
         promptCountdownText.fontStyle = FontStyles.Bold;
-        promptCountdownText.color = new Color(0.98f, 0.84f, 0.32f, 1f);
+        promptCountdownText.color = VectorUIKit.AccentGold;
         promptCountdownText.enableAutoSizing = true;
         promptCountdownText.fontSizeMin = 13f;
         promptCountdownText.fontSizeMax = 24f;
@@ -1083,20 +976,20 @@ public class AdMobManager : MonoBehaviour
         CrearBotonModal(
             card.transform,
             "BtnWatchNow",
-            "🎬 Ver anuncio ahora (+2 ⚡ Comodines)",
+            "🎬 Reclamar Ahora (+2 ⚡ Comodines)",
             new Vector2(0.07f, 0.18f),
             new Vector2(0.93f, 0.30f),
-            new Color(0.15f, 0.52f, 0.32f, 1f),
+            VectorUIKit.AccentEmerald,
             AceptarYMostrarIntersticialBonificado
         );
 
         CrearBotonModal(
             card.transform,
             "BtnNoThanksOptOut",
-            "✖ No, gracias (Continuar al siguiente nivel)",
+            "✖ No, gracias (Continuar al nivel)",
             new Vector2(0.07f, 0.045f),
             new Vector2(0.93f, 0.155f),
-            new Color(0.26f, 0.31f, 0.40f, 1f),
+            new Color(0.24f, 0.30f, 0.40f, 1f),
             RechazarIntersticialBonificado
         );
 
@@ -1122,7 +1015,7 @@ public class AdMobManager : MonoBehaviour
         rt.offsetMax = Vector2.zero;
 
         Image img = btnObj.GetComponent<Image>();
-        img.color = colorFondo;
+        VectorUIKit.ApplyRoundedStyle(img, colorFondo, pill: true, addShadow: true);
 
         Button btn = btnObj.GetComponent<Button>();
         btn.onClick.AddListener(accion);
@@ -1147,12 +1040,6 @@ public class AdMobManager : MonoBehaviour
         tmp.raycastTarget = false;
     }
 
-    // =========================================================================
-    // 5. BONIFICADO / REWARDED (ca-app-pub-2266949018056491/2693038440)
-    // Política AdMob: Solo se muestra tras aceptación explícita (opt-in) del usuario
-    // en botones que indican con exactitud cuántos Comodines recibirá.
-    // =========================================================================
-
     public void CargarRewardedAd()
     {
         if (!sdkInicializado) return;
@@ -1165,14 +1052,8 @@ public class AdMobManager : MonoBehaviour
 
         RewardedAd.Load(RewardedId, new AdRequest(), (RewardedAd ad, LoadAdError error) =>
         {
-            if (error != null || ad == null)
-            {
-                Debug.LogWarning($"[AdMob] Error al pre-cargar RewardedAd: {error}");
-                return;
-            }
-
+            if (error != null || ad == null) return;
             rewardedAd = ad;
-            Debug.Log("[AdMob] RewardedAd (Bonificado) listo.");
         });
     }
 
@@ -1189,9 +1070,9 @@ public class AdMobManager : MonoBehaviour
             if (FeedbackManager.Instance != null)
             {
                 FeedbackManager.Instance.MostrarMensajeEstado(
-                    "⏳ Cargando anuncio bonificado de AdMob... Probá de nuevo en unos segundos.",
-                    new Color(0.22f, 0.34f, 0.52f, 0.95f),
-                    2.6f
+                    "⏳ Cargando video bonificado... Probá de nuevo en unos segundos.",
+                    new Color(0.20f, 0.32f, 0.50f, 0.95f),
+                    2.4f
                 );
             }
             return;
@@ -1216,9 +1097,9 @@ public class AdMobManager : MonoBehaviour
                 if (FeedbackManager.Instance != null)
                 {
                     FeedbackManager.Instance.MostrarMensajeEstado(
-                        $"🎉 ¡Recompensa acreditada! Recibiste +{cantidadComodines} Comodín(es) de Reestructuración (⚡).",
-                        new Color(0.14f, 0.48f, 0.28f, 0.96f),
-                        3.0f
+                        $"🎉 ¡Bono acreditado! Recibiste +{cantidadComodines} ⚡ Comodín(es).",
+                        new Color(0.10f, 0.48f, 0.30f, 0.96f),
+                        2.8f
                     );
                 }
             }

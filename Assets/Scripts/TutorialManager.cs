@@ -11,20 +11,23 @@ public class TutorialManager : MonoBehaviour
     public TextMeshProUGUI tutorialText;
     public Button botonContinuar;
 
+    private GameObject modalCardContainer;
     private Button botonIrAlMenuEnVictoria;
     private Button botonBonificadoEnVictoria;
+    private TextMeshProUGUI labelBotonBonificado;
 
     private int pasoActual = 0;
     private bool tutorialActivo = false;
     private bool enPantallaVictoria = false;
     private bool tutorialYaMostradoEnSesion = false;
+    private int estrellasUltimaVictoria = 3;
 
     private readonly string[] instrucciones = new string[]
     {
-        "<b>🏢 Bienvenido a OrgRise</b>\n\nTu objetivo es diseñar estructuras organizacionales eficientes aplicando los principios de <b>Gestión de la Organización</b>.",
-        "<b>1. Cadena y Unidad de Mando</b>\n\nArrastrá una línea entre un subordinado y su jefe inmediato (Empleado → Gerente → Director → CEO).\n\nPodés cerrar este aviso y hacer tu primera conexión.",
-        "<b>2. Tramo de Control</b>\n\nCada superior tiene un límite máximo de reportes directos (<b>Tramo: X/Max</b>). Si lo superás, se produce un cuello de botella.",
-        "<b>3. Departamentalización y Reestructuración</b>\n\nRespetá el área/color de cada unidad. Hacé <b>doble toque</b> sobre un nodo para desconectarlo, o usá el <b>Comodín</b> para mover una rama completa."
+        "<b>🏢 ¡Bienvenido a OrgRise!</b>\n\nConvertite en Arquitecto Corporativo: diseñá la estructura de startups y multinacionales para llevarlas al éxito.",
+        "<b>1. Conectá la Jerarquía</b>\n\nArrastrá una línea desde un puesto hacia su líder superior (<b>👤 Especialista → 📊 Líder → 💼 VP → 👑 CEO</b>).\n\nLa línea brillará en <color=#10B981><b>VERDE</b></color> si la conexión es válida.",
+        "<b>2. Cuidá el Cupo de Mando</b>\n\nCada líder tiene un límite de supervisión (<b>Cupo: X/Max</b>). Si se llena, deberás delegar en otro mando de la misma división.",
+        "<b>3. Herramientas Ejecutivas</b>\n\n• <b>Doble toque</b> sobre una tarjeta para desconectarla.\n• Usá <b>⚡ Reestructurar</b> para mover líderes con equipo a cargo.\n• Usá <b>🎯 Auto-Pista</b> si necesitás que un Headhunter conecte un puesto clave."
     };
 
     void Awake()
@@ -43,7 +46,6 @@ public class TutorialManager : MonoBehaviour
             botonContinuar.onClick.AddListener(AlPresionarBotonPrincipal);
         }
 
-        // Si no hay LevelManager (escena aislada), iniciamos el tutorial; de lo contrario, LevelManager abre primero el Menú Principal
         if (LevelManager.Instance == null && !tutorialActivo && !enPantallaVictoria && !tutorialYaMostradoEnSesion)
         {
             IniciarTutorial();
@@ -68,7 +70,6 @@ public class TutorialManager : MonoBehaviour
             if (panelRt != null)
             {
                 panelRt.localScale = Vector3.one;
-                // Dejamos libre 0.00 a 0.065 abajo para no tapar ni tocar el Banner de AdMob
                 panelRt.anchorMin = new Vector2(0f, 0.065f);
                 panelRt.anchorMax = new Vector2(1f, 1f);
                 panelRt.offsetMin = Vector2.zero;
@@ -78,8 +79,36 @@ public class TutorialManager : MonoBehaviour
             Image panelImg = tutorialPanel.GetComponent<Image>();
             if (panelImg != null)
             {
-                panelImg.color = new Color(0.04f, 0.07f, 0.12f, 0.94f);
+                panelImg.color = new Color(0.03f, 0.06f, 0.12f, 0.94f);
                 panelImg.raycastTarget = true;
+            }
+
+            // Tarjeta vectorial interior para el modal
+            if (modalCardContainer == null)
+            {
+                Transform existing = tutorialPanel.transform.Find("VectorModalCardBg");
+                if (existing != null)
+                {
+                    modalCardContainer = existing.gameObject;
+                }
+                else
+                {
+                    modalCardContainer = new GameObject("VectorModalCardBg", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                    modalCardContainer.transform.SetParent(tutorialPanel.transform, false);
+                    modalCardContainer.transform.SetAsFirstSibling();
+
+                    RectTransform cardRt = modalCardContainer.GetComponent<RectTransform>();
+                    cardRt.localScale = Vector3.one;
+                    cardRt.anchorMin = new Vector2(0.05f, 0.06f);
+                    cardRt.anchorMax = new Vector2(0.95f, 0.92f);
+                    cardRt.offsetMin = Vector2.zero;
+                    cardRt.offsetMax = Vector2.zero;
+
+                    Image cardImg = modalCardContainer.GetComponent<Image>();
+                    VectorUIKit.ApplyRoundedStyle(cardImg, new Color(0.09f, 0.14f, 0.23f, 0.99f), pill: false, addShadow: true);
+                    VectorUIKit.ApplyOutline(cardImg, new Color(0.35f, 0.58f, 0.95f, 0.35f), 2f);
+                    cardImg.raycastTarget = false;
+                }
             }
         }
 
@@ -89,16 +118,16 @@ public class TutorialManager : MonoBehaviour
             if (txtRt != null)
             {
                 txtRt.localScale = Vector3.one;
-                txtRt.anchorMin = new Vector2(0.08f, 0.39f);
-                txtRt.anchorMax = new Vector2(0.92f, 0.86f);
+                txtRt.anchorMin = new Vector2(0.09f, 0.39f);
+                txtRt.anchorMax = new Vector2(0.91f, 0.88f);
                 txtRt.offsetMin = Vector2.zero;
                 txtRt.offsetMax = Vector2.zero;
             }
 
             tutorialText.margin = Vector4.zero;
             tutorialText.enableAutoSizing = true;
-            tutorialText.fontSizeMin = 18f;
-            tutorialText.fontSizeMax = 34f;
+            tutorialText.fontSizeMin = 16f;
+            tutorialText.fontSizeMax = 32f;
             tutorialText.alignment = TextAlignmentOptions.Center;
         }
 
@@ -108,10 +137,17 @@ public class TutorialManager : MonoBehaviour
             if (btnRt != null)
             {
                 btnRt.localScale = Vector3.one;
-                btnRt.anchorMin = new Vector2(0.14f, 0.28f);
-                btnRt.anchorMax = new Vector2(0.86f, 0.36f);
+                btnRt.anchorMin = new Vector2(0.12f, 0.285f);
+                btnRt.anchorMax = new Vector2(0.88f, 0.365f);
                 btnRt.offsetMin = Vector2.zero;
                 btnRt.offsetMax = Vector2.zero;
+            }
+
+            Image btnImg = botonContinuar.GetComponent<Image>();
+            if (btnImg != null)
+            {
+                VectorUIKit.ApplyRoundedStyle(btnImg, VectorUIKit.AccentEmerald, pill: true, addShadow: true);
+                VectorUIKit.ApplyOutline(btnImg, new Color(1f, 1f, 1f, 0.30f), 1.5f);
             }
 
             TextMeshProUGUI btnTxt = botonContinuar.GetComponentInChildren<TextMeshProUGUI>();
@@ -127,9 +163,10 @@ public class TutorialManager : MonoBehaviour
                     btnTxtRt.offsetMax = new Vector2(-12f, -6f);
                 }
                 btnTxt.margin = Vector4.zero;
+                btnTxt.color = Color.white;
                 btnTxt.enableAutoSizing = true;
                 btnTxt.fontSizeMin = 17f;
-                btnTxt.fontSizeMax = 30f;
+                btnTxt.fontSizeMax = 28f;
                 btnTxt.fontStyle = FontStyles.Bold;
                 btnTxt.alignment = TextAlignmentOptions.Center;
             }
@@ -142,7 +179,6 @@ public class TutorialManager : MonoBehaviour
     {
         if (tutorialPanel == null) return;
 
-        // Botón voluntario de Anuncio Bonificado en pantalla de victoria (+2 Comodines)
         if (botonBonificadoEnVictoria == null)
         {
             GameObject rewObj = new GameObject("BotonBonificadoVictoria", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
@@ -150,22 +186,17 @@ public class TutorialManager : MonoBehaviour
 
             RectTransform rewRt = rewObj.GetComponent<RectTransform>();
             rewRt.localScale = Vector3.one;
-            rewRt.anchorMin = new Vector2(0.14f, 0.185f);
-            rewRt.anchorMax = new Vector2(0.86f, 0.26f);
+            rewRt.anchorMin = new Vector2(0.12f, 0.188f);
+            rewRt.anchorMax = new Vector2(0.88f, 0.265f);
             rewRt.offsetMin = Vector2.zero;
             rewRt.offsetMax = Vector2.zero;
 
             Image rewImg = rewObj.GetComponent<Image>();
-            rewImg.color = new Color(0.42f, 0.22f, 0.58f, 1f);
+            VectorUIKit.ApplyRoundedStyle(rewImg, new Color(0.48f, 0.22f, 0.72f, 1f), pill: true, addShadow: true);
+            VectorUIKit.ApplyOutline(rewImg, VectorUIKit.AccentGold, 1.5f);
 
             botonBonificadoEnVictoria = rewObj.GetComponent<Button>();
-            botonBonificadoEnVictoria.onClick.AddListener(() =>
-            {
-                if (AdMobManager.Instance != null)
-                {
-                    AdMobManager.Instance.MostrarAnuncioBonificado(2);
-                }
-            });
+            botonBonificadoEnVictoria.onClick.AddListener(AlPresionarBonoVictoria);
 
             GameObject rewTxtObj = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             rewTxtObj.transform.SetParent(rewObj.transform, false);
@@ -173,23 +204,22 @@ public class TutorialManager : MonoBehaviour
             rewTxtRt.localScale = Vector3.one;
             rewTxtRt.anchorMin = Vector2.zero;
             rewTxtRt.anchorMax = Vector2.one;
-            rewTxtRt.offsetMin = new Vector2(10f, 4f);
-            rewTxtRt.offsetMax = new Vector2(-10f, -4f);
+            rewTxtRt.offsetMin = new Vector2(12f, 4f);
+            rewTxtRt.offsetMax = new Vector2(-12f, -4f);
 
-            TextMeshProUGUI rewTmp = rewTxtObj.GetComponent<TextMeshProUGUI>();
-            rewTmp.text = "🎬 Bono Extra: +2 ⚡ Comodines (Ver Video)";
-            rewTmp.color = Color.white;
-            rewTmp.fontStyle = FontStyles.Bold;
-            rewTmp.alignment = TextAlignmentOptions.Center;
-            rewTmp.enableAutoSizing = true;
-            rewTmp.fontSizeMin = 14f;
-            rewTmp.fontSizeMax = 24f;
-            rewTmp.raycastTarget = false;
+            labelBotonBonificado = rewTxtObj.GetComponent<TextMeshProUGUI>();
+            labelBotonBonificado.text = "🎬 Bono Ejecutivo: +3 ⚡ Comodines (Ver Video)";
+            labelBotonBonificado.color = Color.white;
+            labelBotonBonificado.fontStyle = FontStyles.Bold;
+            labelBotonBonificado.alignment = TextAlignmentOptions.Center;
+            labelBotonBonificado.enableAutoSizing = true;
+            labelBotonBonificado.fontSizeMin = 13f;
+            labelBotonBonificado.fontSizeMax = 23f;
+            labelBotonBonificado.raycastTarget = false;
 
             rewObj.SetActive(false);
         }
 
-        // Botón Volver al Menú Principal
         if (botonIrAlMenuEnVictoria == null)
         {
             GameObject btnObj = new GameObject("BotonVolverAlMenu", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
@@ -197,13 +227,14 @@ public class TutorialManager : MonoBehaviour
 
             RectTransform rt = btnObj.GetComponent<RectTransform>();
             rt.localScale = Vector3.one;
-            rt.anchorMin = new Vector2(0.14f, 0.09f);
-            rt.anchorMax = new Vector2(0.86f, 0.165f);
+            rt.anchorMin = new Vector2(0.12f, 0.095f);
+            rt.anchorMax = new Vector2(0.88f, 0.168f);
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
 
             Image img = btnObj.GetComponent<Image>();
-            img.color = new Color(0.20f, 0.27f, 0.38f, 1f);
+            VectorUIKit.ApplyRoundedStyle(img, new Color(0.18f, 0.25f, 0.36f, 1f), pill: true, addShadow: true);
+            VectorUIKit.ApplyOutline(img, new Color(1f, 1f, 1f, 0.20f), 1.2f);
 
             botonIrAlMenuEnVictoria = btnObj.GetComponent<Button>();
             botonIrAlMenuEnVictoria.onClick.AddListener(() =>
@@ -225,16 +256,48 @@ public class TutorialManager : MonoBehaviour
             txtRt.offsetMax = new Vector2(-10f, -4f);
 
             TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
-            tmp.text = "☰ Selector de Niveles / Menú";
+            tmp.text = "☰ Mapa de Niveles / Menú";
             tmp.color = Color.white;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.enableAutoSizing = true;
-            tmp.fontSizeMin = 15f;
-            tmp.fontSizeMax = 25f;
+            tmp.fontSizeMin = 14f;
+            tmp.fontSizeMax = 24f;
             tmp.raycastTarget = false;
 
             btnObj.SetActive(false);
+        }
+    }
+
+    private void AlPresionarBonoVictoria()
+    {
+        int recompensaComodines = estrellasUltimaVictoria < 3 ? 2 : 3;
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.MostrarAnuncioBonificado(recompensaComodines, () =>
+            {
+                if (estrellasUltimaVictoria < 3 && LevelManager.Instance != null)
+                {
+                    LevelManager.Instance.MejorarNivelActualATresEstrellas();
+                    estrellasUltimaVictoria = 3;
+                }
+                if (botonBonificadoEnVictoria != null)
+                {
+                    botonBonificadoEnVictoria.interactable = false;
+                }
+                if (labelBotonBonificado != null)
+                {
+                    labelBotonBonificado.text = "✓ ¡Bono 3⭐ + Comodines Acreditados!";
+                }
+            });
+        }
+        else
+        {
+            if (WildcardManager.Instance != null) WildcardManager.Instance.RecompensarComodin(recompensaComodines);
+            if (estrellasUltimaVictoria < 3 && LevelManager.Instance != null)
+            {
+                LevelManager.Instance.MejorarNivelActualATresEstrellas();
+            }
         }
     }
 
@@ -272,7 +335,7 @@ public class TutorialManager : MonoBehaviour
             AdMobManager.Instance.CrearFranjaSeguraBannerUI();
         }
 
-        ActualizarTextoBoton("Continuar");
+        ActualizarTextoBoton("Siguiente ➔");
         MostrarPaso(pasoActual);
     }
 
@@ -292,7 +355,7 @@ public class TutorialManager : MonoBehaviour
         if (botonContinuar != null)
         {
             botonContinuar.gameObject.SetActive(true);
-            ActualizarTextoBoton(indice == instrucciones.Length - 1 ? "¡Empezar a Jugar!" : "Continuar");
+            ActualizarTextoBoton(indice == instrucciones.Length - 1 ? "¡Comenzar Operación!" : "Siguiente ➔");
         }
     }
 
@@ -307,8 +370,6 @@ public class TutorialManager : MonoBehaviour
             {
                 if (AdMobManager.Instance != null)
                 {
-                    // En la transición natural de fin de nivel activamos el Intersticial Bonificado (con prompt opt-out reglamentario)
-                    // o el Intersticial estándar si corresponde por conteo de acciones.
                     AdMobManager.Instance.IntentarTransicionVictoriaSiguienteNivel(
                         () => LevelManager.Instance.AvanzarSiguienteNivel(),
                         2
@@ -352,12 +413,13 @@ public class TutorialManager : MonoBehaviour
         if (tutorialPanel != null) tutorialPanel.SetActive(false);
     }
 
-    public void MostrarPantallaNivelCompletado(string resumenAcademico)
+    public void MostrarPantallaNivelCompletado(string resumenComercial, int estrellasObtenidas = 3)
     {
         ConfigurarEsteticaPanelVertical();
 
         tutorialActivo = false;
         enPantallaVictoria = true;
+        estrellasUltimaVictoria = estrellasObtenidas;
 
         if (tutorialPanel != null)
         {
@@ -371,7 +433,7 @@ public class TutorialManager : MonoBehaviour
 
         if (tutorialText != null)
         {
-            tutorialText.text = $"<color=#69F0AE><b>¡ORGANIGRAMA VALIDADO!</b></color>\n\n{resumenAcademico}";
+            tutorialText.text = $"<color=#34D399><b>¡EMPRESA OPTIMIZADA!</b></color>\n\n{resumenComercial}";
         }
 
         if (botonContinuar != null)
@@ -383,6 +445,13 @@ public class TutorialManager : MonoBehaviour
         if (botonBonificadoEnVictoria != null)
         {
             botonBonificadoEnVictoria.gameObject.SetActive(true);
+            botonBonificadoEnVictoria.interactable = true;
+            if (labelBotonBonificado != null)
+            {
+                labelBotonBonificado.text = estrellasObtenidas < 3
+                    ? "🎬 Subir a 3⭐ + Bono +2 ⚡ (Ver Video)"
+                    : "🎬 Bono Ejecutivo: +3 ⚡ Comodines (Ver Video)";
+            }
         }
 
         if (botonIrAlMenuEnVictoria != null)

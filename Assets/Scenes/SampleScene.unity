@@ -1551,6 +1551,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelManager
   nivelActual: {fileID: 11400000, guid: d586a29b679e77641bee19b08229c939, type: 2}
   nodosActivos: []
+  indiceNivelCampana: 0
+  nivelMaxDesbloqueado: 0
+  xpCarrera: 0
+  criterioActual: 0
+  modoAutoridadActual: 0
+  ExigirCadenaEstricta: 1
 --- !u!4 &1875649801
 Transform:
   m_ObjectHideFlags: 0
@@ -1580,6 +1586,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FeedbackManager
   snapSound: {fileID: 8300000, guid: 45a4ee52a0f2b50499a80137cf37f6db, type: 3}
   victorySound: {fileID: 8300000, guid: 0bcb66b9382751a45bc6a74711f48730, type: 3}
+  backgroundMusicClip: {fileID: 0}
 --- !u!82 &1875649803
 AudioSource:
   m_ObjectHideFlags: 0
@@ -1705,6 +1712,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DailyStreakManager
   currentStreak: 0
+  bestStreak: 0
+  lostStreakToRecover: 0
   alreadyPlayedToday: 0
 --- !u!114 &1875649806
 MonoBehaviour:
@@ -1750,6 +1759,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AdMobManager
   appId: ca-app-pub-2266949018056491~8163314986
+  modoPruebas: 0
   bannerAdUnitId: ca-app-pub-2266949018056491/9799830280
   rewardedAdUnitId: ca-app-pub-2266949018056491/2693038440
   appOpenAdUnitId: ca-app-pub-2266949018056491/6383329457

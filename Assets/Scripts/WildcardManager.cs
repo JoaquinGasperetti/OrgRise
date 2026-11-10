@@ -3,8 +3,8 @@ using TMPro;
 using UnityEngine.UI;
 
 /// <summary>
-/// Gestiona la disponibilidad, consumo y persistencia de los Comodines de Reestructuración.
-/// Permite desbloquear el movimiento de mandos con personal a cargo o adquirir más mediante anuncios bonificados.
+/// Gestiona los Comodines de Reestructuración (⚡) y el sistema de Auto-Pista / Headhunter (🎯)
+/// con alta conversión de anuncios bonificados (Rewarded Ads) para maximizar la rentabilidad.
 /// </summary>
 public class WildcardManager : MonoBehaviour
 {
@@ -22,7 +22,8 @@ public class WildcardManager : MonoBehaviour
 
     private Image buttonImage;
     private TextMeshProUGUI buttonLabel;
-    private Button botonVerAnuncioBonificado;
+    private Button botonHeadhunterHint;
+    private TextMeshProUGUI headhunterLabel;
 
     void Awake()
     {
@@ -51,7 +52,7 @@ public class WildcardManager : MonoBehaviour
     void Start()
     {
         NormalizarBotonComodinVertical();
-        CrearBotonBonificadoEnTablero();
+        CrearBotonHeadhunterEnTablero();
 
         if (botonComodin != null)
         {
@@ -63,11 +64,6 @@ public class WildcardManager : MonoBehaviour
         ActualizarUI();
     }
 
-    /// <summary>
-    /// Coloca el botón Comodín en la franja 13.8% a 19.2% de la pantalla (a la izquierda)
-    /// dejando espacio a su derecha para el botón de Anuncio Bonificado (+1 ⚡) y
-    /// respetando la separación de seguridad sobre el Banner inferior de AdMob (0% a 6.5%).
-    /// </summary>
     private void NormalizarBotonComodinVertical()
     {
         if (botonComodin == null) return;
@@ -76,10 +72,17 @@ public class WildcardManager : MonoBehaviour
         if (btnRt != null)
         {
             btnRt.localScale = Vector3.one;
-            btnRt.anchorMin = new Vector2(0.04f, 0.138f);
-            btnRt.anchorMax = new Vector2(0.62f, 0.192f);
+            btnRt.anchorMin = new Vector2(0.03f, 0.138f);
+            btnRt.anchorMax = new Vector2(0.51f, 0.194f);
             btnRt.offsetMin = Vector2.zero;
             btnRt.offsetMax = Vector2.zero;
+        }
+
+        Image bgImg = botonComodin.GetComponent<Image>();
+        if (bgImg != null)
+        {
+            VectorUIKit.ApplyRoundedStyle(bgImg, new Color(0.14f, 0.22f, 0.34f, 0.98f), pill: true, addShadow: true);
+            VectorUIKit.ApplyOutline(bgImg, new Color(1f, 1f, 1f, 0.22f), 1.2f);
         }
 
         TextMeshProUGUI mainLabel = BuscarTextoPrincipalBoton();
@@ -89,17 +92,18 @@ public class WildcardManager : MonoBehaviour
             if (lblRt != null)
             {
                 lblRt.localScale = Vector3.one;
-                lblRt.anchorMin = new Vector2(0.04f, 0.08f);
-                lblRt.anchorMax = new Vector2(0.75f, 0.92f);
+                lblRt.anchorMin = new Vector2(0.05f, 0.08f);
+                lblRt.anchorMax = new Vector2(0.76f, 0.92f);
                 lblRt.offsetMin = Vector2.zero;
                 lblRt.offsetMax = Vector2.zero;
             }
             mainLabel.margin = Vector4.zero;
             mainLabel.alignment = TextAlignmentOptions.Center;
             mainLabel.enableAutoSizing = true;
-            mainLabel.fontSizeMin = 13f;
-            mainLabel.fontSizeMax = 24f;
+            mainLabel.fontSizeMin = 11f;
+            mainLabel.fontSizeMax = 21f;
             mainLabel.fontStyle = FontStyles.Bold;
+            mainLabel.color = Color.white;
         }
 
         if (textoContador != null)
@@ -108,47 +112,48 @@ public class WildcardManager : MonoBehaviour
             if (countRt != null)
             {
                 countRt.localScale = Vector3.one;
-                countRt.anchorMin = new Vector2(0.75f, 0.08f);
+                countRt.anchorMin = new Vector2(0.76f, 0.08f);
                 countRt.anchorMax = new Vector2(0.96f, 0.92f);
                 countRt.offsetMin = Vector2.zero;
                 countRt.offsetMax = Vector2.zero;
             }
             textoContador.margin = Vector4.zero;
-            textoContador.color = new Color(0.12f, 0.15f, 0.22f, 1f);
+            textoContador.color = VectorUIKit.AccentGold;
             textoContador.alignment = TextAlignmentOptions.Center;
             textoContador.enableAutoSizing = true;
-            textoContador.fontSizeMin = 14f;
-            textoContador.fontSizeMax = 25f;
+            textoContador.fontSizeMin = 13f;
+            textoContador.fontSizeMax = 23f;
             textoContador.fontStyle = FontStyles.Bold;
         }
     }
 
     /// <summary>
-    /// Crea un botón voluntario (Opt-In) de Anuncio Bonificado de AdMob junto al botón de Comodín
-    /// indicando explícitamente la acción y la recompensa (+1 ⚡ Comodín por ver anuncio).
+    /// Crea el botón comercial "🎯 Auto-Pista / Headhunter" que conecta automáticamente un puesto pendiente
+    /// al mirar un video bonificado (o consumir comodín si tiene más de 3).
     /// </summary>
-    private void CrearBotonBonificadoEnTablero()
+    private void CrearBotonHeadhunterEnTablero()
     {
-        if (botonVerAnuncioBonificado != null || botonComodin == null) return;
+        if (botonHeadhunterHint != null || botonComodin == null) return;
 
         Transform parent = botonComodin.transform.parent;
         if (parent == null) return;
 
-        GameObject btnObj = new GameObject("BotonAnuncioBonificadoComodin", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        GameObject btnObj = new GameObject("BotonHeadhunterAutoPista", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         btnObj.transform.SetParent(parent, false);
 
         RectTransform rt = btnObj.GetComponent<RectTransform>();
         rt.localScale = Vector3.one;
-        rt.anchorMin = new Vector2(0.64f, 0.138f);
-        rt.anchorMax = new Vector2(0.96f, 0.192f);
+        rt.anchorMin = new Vector2(0.53f, 0.138f);
+        rt.anchorMax = new Vector2(0.97f, 0.194f);
         rt.offsetMin = Vector2.zero;
         rt.offsetMax = Vector2.zero;
 
         Image img = btnObj.GetComponent<Image>();
-        img.color = new Color(0.42f, 0.22f, 0.58f, 0.98f);
+        VectorUIKit.ApplyRoundedStyle(img, new Color(0.44f, 0.22f, 0.68f, 0.98f), pill: true, addShadow: true);
+        VectorUIKit.ApplyOutline(img, new Color(0.85f, 0.70f, 1f, 0.35f), 1.2f);
 
-        botonVerAnuncioBonificado = btnObj.GetComponent<Button>();
-        botonVerAnuncioBonificado.onClick.AddListener(SolicitarComodinConAnuncioBonificado);
+        botonHeadhunterHint = btnObj.GetComponent<Button>();
+        botonHeadhunterHint.onClick.AddListener(AlPresionarBotonHeadhunter);
 
         GameObject txtObj = new GameObject("Label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         txtObj.transform.SetParent(btnObj.transform, false);
@@ -159,26 +164,45 @@ public class WildcardManager : MonoBehaviour
         txtRt.offsetMin = Vector2.zero;
         txtRt.offsetMax = Vector2.zero;
 
-        TextMeshProUGUI tmp = txtObj.GetComponent<TextMeshProUGUI>();
-        tmp.text = "🎬 +1 ⚡ (Video)";
-        tmp.color = Color.white;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.enableAutoSizing = true;
-        tmp.fontSizeMin = 12f;
-        tmp.fontSizeMax = 22f;
-        tmp.raycastTarget = false;
+        headhunterLabel = txtObj.GetComponent<TextMeshProUGUI>();
+        headhunterLabel.text = "🎯 Auto-Pista (🎬 Video)";
+        headhunterLabel.color = Color.white;
+        headhunterLabel.fontStyle = FontStyles.Bold;
+        headhunterLabel.alignment = TextAlignmentOptions.Center;
+        headhunterLabel.enableAutoSizing = true;
+        headhunterLabel.fontSizeMin = 11f;
+        headhunterLabel.fontSizeMax = 20f;
+        headhunterLabel.raycastTarget = false;
+    }
+
+    public void AlPresionarBotonHeadhunter()
+    {
+        if (LevelManager.Instance == null) return;
+
+        // Si el jugador decide usar el Headhunter mediante anuncio bonificado, se conecta 1 nodo automáticamente y además suma +1 comodín
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.MostrarAnuncioBonificado(1, () =>
+            {
+                LevelManager.Instance.AplicarAutoPistaHeadhunter();
+                ActualizarUI();
+            });
+        }
+        else
+        {
+            LevelManager.Instance.AplicarAutoPistaHeadhunter();
+        }
     }
 
     public void SolicitarComodinConAnuncioBonificado()
     {
         if (AdMobManager.Instance != null)
         {
-            AdMobManager.Instance.MostrarAnuncioBonificado(1, ActualizarUI);
+            AdMobManager.Instance.MostrarAnuncioBonificado(2, ActualizarUI);
         }
         else
         {
-            RecompensarComodin(1);
+            RecompensarComodin(2);
         }
     }
 
@@ -203,23 +227,15 @@ public class WildcardManager : MonoBehaviour
             if (FeedbackManager.Instance != null)
             {
                 string msg = comodinActivo
-                    ? "Comodín ACTIVO: ahora podés mover o desconectar un mando con toda su rama a cargo."
+                    ? "⚡ Comodín ACTIVO: podés mover o desconectar cualquier líder con equipo a cargo."
                     : "Modo Comodín desactivado.";
-                Color c = comodinActivo ? new Color(0.75f, 0.52f, 0.08f, 0.95f) : new Color(0.2f, 0.25f, 0.32f, 0.9f);
-                FeedbackManager.Instance.MostrarMensajeEstado(msg, c, 2.8f);
+                Color c = comodinActivo ? new Color(0.78f, 0.52f, 0.08f, 0.96f) : new Color(0.18f, 0.24f, 0.34f, 0.94f);
+                FeedbackManager.Instance.MostrarMensajeEstado(msg, c, 2.5f);
             }
         }
         else
         {
-            // Si no le quedan comodines y presiona el botón, iniciamos el anuncio Bonificado de AdMob por +1 Comodín
-            if (AdMobManager.Instance != null)
-            {
-                AdMobManager.Instance.MostrarAnuncioBonificado(1, ActualizarUI);
-            }
-            else
-            {
-                RecompensarComodin(1);
-            }
+            SolicitarComodinConAnuncioBonificado();
         }
     }
 
@@ -255,24 +271,26 @@ public class WildcardManager : MonoBehaviour
         if (textoContador != null)
         {
             textoContador.text = $"x{wildcardsDisponibles}";
+            textoContador.color = comodinActivo ? new Color(0.10f, 0.14f, 0.22f, 1f) : VectorUIKit.AccentGold;
         }
 
         if (buttonImage != null)
         {
             buttonImage.color = comodinActivo
-                ? new Color(1.0f, 0.84f, 0.25f, 1.0f)
-                : new Color(0.92f, 0.95f, 0.99f, 1.0f);
+                ? VectorUIKit.AccentGold
+                : new Color(0.14f, 0.22f, 0.34f, 0.98f);
         }
 
         if (buttonLabel != null)
         {
+            buttonLabel.color = comodinActivo ? new Color(0.08f, 0.12f, 0.20f, 1f) : Color.white;
             if (wildcardsDisponibles <= 0 && !comodinActivo)
             {
-                buttonLabel.text = "🎬 Obtener Comodín (+1 ⚡)";
+                buttonLabel.text = "🎬 +2 ⚡ Comodines";
             }
             else
             {
-                buttonLabel.text = comodinActivo ? "⚡ Reestructuración [ON]" : "⚡ Comodín Reestructurar";
+                buttonLabel.text = comodinActivo ? "⚡ Reestructurar [ON]" : "⚡ Reestructurar";
             }
         }
     }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
@@ -10,8 +11,10 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
     private Canvas canvas;
 
     [Header("Referencias UI")]
-    public GameObject linePrefab; // Prefab de la línea (Image)
-    private RectTransform tempLine; // Línea que se dibuja al arrastrar
+    public GameObject linePrefab;
+    private RectTransform tempLine;
+    private Image tempLineImage;
+    private EmployeeNode lastHoveredNode;
 
     [HideInInspector] public GameObject currentManagerLine;
     [HideInInspector] public GameObject currentMatrixLine;
@@ -25,7 +28,6 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        // Doble clic / doble toque o clic derecho para desconectar al subordinado de su jefe actual
         if (eventData.button == PointerEventData.InputButton.Right || eventData.clickCount >= 2)
         {
             TryDisconnectFromManager();
@@ -36,7 +38,6 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
     {
         if (myNode == null) return;
 
-        // Si tiene conexión matricial activa y se solicita desconexión, removemos la matricial primero
         if (myNode.matrixProjectManager != null)
         {
             string exMatrixJefe = myNode.matrixProjectManager.roleName;
@@ -63,7 +64,7 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
         {
             if (FeedbackManager.Instance != null)
             {
-                FeedbackManager.Instance.PlayErrorFeedback(myNode, "Reestructuración bloqueada: este mando ya tiene subordinados a cargo. Activá el Comodín para mover o desconectar toda la rama.");
+                FeedbackManager.Instance.PlayErrorFeedback(myNode, "Reestructuración bloqueada: este líder ya tiene equipo a cargo. Activá un ⚡ Comodín para mover toda la rama.");
             }
             return;
         }
@@ -103,147 +104,139 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
         Transform lineParent = transform.parent != null ? transform.parent : canvas.transform;
         GameObject lineObj = Instantiate(linePrefab, lineParent);
-        Image lineImg = lineObj.GetComponent<Image>();
-        if (lineImg != null)
+        tempLineImage = lineObj.GetComponent<Image>();
+        if (tempLineImage != null)
         {
-            lineImg.raycastTarget = false;
-            lineImg.color = new Color(0.2f, 0.25f, 0.35f, 0.85f);
+            tempLineImage.raycastTarget = false;
+            tempLineImage.sprite = VectorUIKit.GetRoundedSprite(pill: true);
+            tempLineImage.type = Image.Type.Sliced;
+            tempLineImage.color = VectorUIKit.AccentCyan;
         }
 
         tempLine = lineObj.GetComponent<RectTransform>();
         tempLine.SetAsFirstSibling();
 
-        UpdateLineVisuals(eventData.position);
+        UpdateLineVisuals(eventData);
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        UpdateLineVisuals(eventData.position);
+        UpdateLineVisuals(eventData);
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        LimpiarHoverTemporal();
         if (tempLine != null)
         {
             Destroy(tempLine.gameObject);
+            tempLine = null;
+            tempLineImage = null;
+        }
+    }
+
+    private void LimpiarHoverTemporal()
+    {
+        if (lastHoveredNode != null)
+        {
+            lastHoveredNode.SetDragHighlight(false, false);
+            lastHoveredNode = null;
         }
     }
 
     public void OnDrop(PointerEventData eventData)
     {
+        LimpiarHoverTemporal();
         if (eventData.pointerDrag == null) return;
 
         UINodeInteraction draggedNodeUI = eventData.pointerDrag.GetComponent<UINodeInteraction>();
         if (draggedNodeUI == null || draggedNodeUI == this) return;
 
-        EmployeeNode nodeA = draggedNodeUI.myNode;
-        EmployeeNode nodeB = this.myNode;
+        ConectarDosNodos(draggedNodeUI.myNode, this.myNode);
+    }
 
-        if (nodeA == null || nodeB == null) return;
+    /// <summary>
+    /// Ejecuta la conexión entre dos nodos (usado tanto por Drag & Drop como por el sistema de Pista Inteligente / Headhunter).
+    /// </summary>
+    public static bool ConectarDosNodos(EmployeeNode nodeA, EmployeeNode nodeB, bool silencioso = false)
+    {
+        if (nodeA == null || nodeB == null || nodeA == nodeB) return false;
 
-        // Determinamos automáticamente quién es el subordinado y quién es el superior según su nivel jerárquico
         EmployeeNode subordinateNode = nodeA;
         EmployeeNode managerNode = nodeB;
-        UINodeInteraction subordinateUI = draggedNodeUI;
-        UINodeInteraction managerUI = this;
 
-        if (nodeA.nivel < nodeB.nivel)
+        if (nodeA.nivel < nodeB.nivel || (nodeA.isRootNode && !nodeB.isRootNode))
         {
             subordinateNode = nodeB;
             managerNode = nodeA;
-            subordinateUI = this;
-            managerUI = draggedNodeUI;
         }
 
-        // Restricción de reestructuración: si el subordinado que cambia de jefe ya tiene gente a cargo y ya tenía un jefe asignado
-        bool requiereComodin = subordinateNode.directReports.Count > 0 && subordinateNode.manager != null;
+        UINodeInteraction subordinateUI = subordinateNode.GetComponent<UINodeInteraction>();
+        UINodeInteraction managerUI = managerNode.GetComponent<UINodeInteraction>();
+        if (subordinateUI == null || managerUI == null) return false;
+
+        bool requiereComodin = !silencioso && subordinateNode.directReports.Count > 0 && subordinateNode.manager != null;
         bool comodinActivo = WildcardManager.Instance != null && WildcardManager.Instance.comodinActivo;
 
         if (requiereComodin && !comodinActivo)
         {
             if (FeedbackManager.Instance != null)
             {
-                FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, "No podés reasignar una rama con subordinados sin activar el Comodín de Reestructuración.");
+                FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, "Para reestructurar un líder con equipo a cargo necesitás activar un ⚡ Comodín.");
             }
-            return;
+            if (LevelManager.Instance != null) LevelManager.Instance.RegistrarErrorMovimiento();
+            return false;
         }
 
         EmployeeNode prevManager = subordinateNode.manager;
 
         if (subordinateNode.TryAssignManager(managerNode, out string motivoRechazo, out bool esConexionMatricial))
         {
-            Transform lineParent = transform.parent != null ? transform.parent : canvas.transform;
-            GameObject permLine = Instantiate(linePrefab, lineParent);
-            permLine.transform.SetAsFirstSibling();
+            subordinateUI.RecrearLinea(managerNode, esConexionMatricial);
 
-            UILineConnection lineLogic = permLine.GetComponent<UILineConnection>();
-            if (lineLogic == null) lineLogic = permLine.AddComponent<UILineConnection>();
-
-            lineLogic.startNode = managerUI.myRect;
-            lineLogic.endNode = subordinateUI.myRect;
-
-            if (esConexionMatricial)
-            {
-                lineLogic.SetMatrixStyle(true);
-                if (subordinateUI.currentMatrixLine != null) Destroy(subordinateUI.currentMatrixLine);
-                subordinateUI.currentMatrixLine = permLine;
-            }
-            else
-            {
-                if (subordinateNode.isStaffNode)
-                {
-                    lineLogic.SetStaffStyle(true);
-                }
-                else
-                {
-                    lineLogic.SetLineColor(new Color(0.18f, 0.32f, 0.48f, 0.95f));
-                }
-
-                if (subordinateUI.currentManagerLine != null) Destroy(subordinateUI.currentManagerLine);
-                subordinateUI.currentManagerLine = permLine;
-            }
-
-            lineLogic.UpdateGeometry(managerUI.myRect.position, subordinateUI.myRect.position);
-
-            // Consumir comodín si se reestructuró una rama activa
             bool comodinConsumido = false;
-            if (subordinateNode.directReports.Count > 0 && comodinActivo && WildcardManager.Instance != null)
+            if (!silencioso && subordinateNode.directReports.Count > 0 && comodinActivo && WildcardManager.Instance != null)
             {
                 WildcardManager.Instance.ConsumirComodin();
                 comodinConsumido = true;
             }
 
-            // Registrar acción para Deshacer (Undo)
-            if (LevelManager.Instance != null)
+            if (!silencioso && LevelManager.Instance != null)
             {
                 LevelManager.Instance.RegistrarAccionConexion(subordinateNode, prevManager, managerNode, esConexionMatricial, comodinConsumido);
             }
 
-            if (FeedbackManager.Instance != null)
+            if (!silencioso && FeedbackManager.Instance != null)
             {
-                string tipoReporte = esConexionMatricial ? "Reporte Matricial (Transversal)" : (subordinateNode.isStaffNode ? "Asesoría Staff" : "Cadena de Mando");
+                string tipoReporte = esConexionMatricial ? "Doble Mando Matricial" : (subordinateNode.isStaffNode ? "Consultoría VIP" : "Línea Ejecutiva");
                 FeedbackManager.Instance.PlaySnapFeedback(
                     managerUI.transform,
-                    $"✓ {tipoReporte}: {subordinateNode.roleName} → {managerNode.roleName} (Tramo: {managerNode.directReports.Count}/{managerNode.maxDirectReports})"
+                    $"✓ {tipoReporte}: {subordinateNode.roleName} → {managerNode.roleName}"
                 );
             }
 
-            if (TutorialManager.Instance != null)
+            if (!silencioso && TutorialManager.Instance != null)
             {
                 TutorialManager.Instance.NotificarConexionExitosa();
             }
 
-            if (LevelManager.Instance != null)
+            if (!silencioso && LevelManager.Instance != null)
             {
                 LevelManager.Instance.EvaluarVictoria();
             }
+            return true;
         }
         else
         {
-            if (FeedbackManager.Instance != null)
+            if (!silencioso)
             {
-                FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, motivoRechazo);
+                if (FeedbackManager.Instance != null)
+                {
+                    FeedbackManager.Instance.PlayErrorFeedback(subordinateNode, motivoRechazo);
+                }
+                if (LevelManager.Instance != null) LevelManager.Instance.RegistrarErrorMovimiento();
             }
+            return false;
         }
     }
 
@@ -292,21 +285,49 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
             }
             else
             {
-                lineLogic.SetLineColor(new Color(0.18f, 0.32f, 0.48f, 0.95f));
+                lineLogic.SetLineColor(new Color(0.22f, 0.74f, 0.97f, 0.95f));
             }
             if (currentManagerLine != null) Destroy(currentManagerLine);
             currentManagerLine = permLine;
         }
 
-        lineLogic.UpdateGeometry(mgrUI.myRect.position, this.myRect.position);
+        lineLogic.UpdateGeometry(targetManager.GetBottomPortWorldPosition(), myNode.GetTopPortWorldPosition());
     }
 
-    private void UpdateLineVisuals(Vector2 screenPointerPos)
+    private void UpdateLineVisuals(PointerEventData eventData)
     {
         if (tempLine == null || myRect == null) return;
 
+        Vector2 screenPointerPos = eventData.position;
         tempLine.pivot = new Vector2(0f, 0.5f);
         tempLine.position = myRect.position;
+
+        // Detectar si el puntero está sobre otra tarjeta para mostrar previsualización en vivo (Verde / Rojo)
+        EmployeeNode hoveredNode = DetectarNodoBajoPuntero(eventData);
+        if (hoveredNode != lastHoveredNode)
+        {
+            LimpiarHoverTemporal();
+            lastHoveredNode = hoveredNode;
+        }
+
+        if (lastHoveredNode != null && lastHoveredNode != myNode)
+        {
+            EmployeeNode sub = myNode.nivel >= lastHoveredNode.nivel ? myNode : lastHoveredNode;
+            EmployeeNode mgr = myNode.nivel >= lastHoveredNode.nivel ? lastHoveredNode : myNode;
+            bool valido = sub.CanAssignManagerPreview(mgr, out _, out bool esMat);
+
+            lastHoveredNode.SetDragHighlight(true, valido, esMat);
+            if (tempLineImage != null)
+            {
+                tempLineImage.color = valido
+                    ? (esMat ? VectorUIKit.AccentPurple : VectorUIKit.AccentEmerald)
+                    : VectorUIKit.AccentCoral;
+            }
+        }
+        else if (tempLineImage != null)
+        {
+            tempLineImage.color = VectorUIKit.AccentCyan;
+        }
 
         RectTransform parentRect = tempLine.parent as RectTransform;
         Camera cam = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay) ? canvas.worldCamera : null;
@@ -319,7 +340,24 @@ public class UINodeInteraction : MonoBehaviour, IBeginDragHandler, IDragHandler,
             float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
 
             tempLine.localRotation = Quaternion.Euler(0f, 0f, angle);
-            tempLine.sizeDelta = new Vector2(distance, 8f);
+            tempLine.sizeDelta = new Vector2(distance, 9f);
         }
+    }
+
+    private EmployeeNode DetectarNodoBajoPuntero(PointerEventData eventData)
+    {
+        if (EventSystem.current == null) return null;
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(eventData, results);
+        foreach (var res in results)
+        {
+            if (res.gameObject == null) continue;
+            EmployeeNode node = res.gameObject.GetComponentInParent<EmployeeNode>();
+            if (node != null && node != myNode)
+            {
+                return node;
+            }
+        }
+        return null;
     }
 }

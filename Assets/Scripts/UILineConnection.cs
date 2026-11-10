@@ -2,9 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Dibuja y actualiza la conexión visual entre dos roles del organigrama.
-/// Soporta trazado ortogonal jerárquico (en codo), conexiones lineales directas,
-/// y estilos diferenciados para Órganos de Staff (asesoría) y Estructuras Matriciales (doble reporte).
+/// Dibuja conectores vectoriales ortogonales con codos redondeados y pulso de datos animado
+/// desde el pin inferior del jefe hasta el pin superior del subordinado.
 /// </summary>
 public class UILineConnection : MonoBehaviour
 {
@@ -15,20 +14,25 @@ public class UILineConnection : MonoBehaviour
     public bool useOrthogonal = true;
     public bool isStaffConnection = false;
     public bool isMatrixConnection = false;
-    public float lineThickness = 6f;
+    public float lineThickness = 7f;
 
     private RectTransform myRect;
     private Image lineImage;
+    private EmployeeNode startEmp;
+    private EmployeeNode endEmp;
 
-    // Segmentos para trazado ortogonal escalonado (en codo)
     private RectTransform segVerticalStart;
     private RectTransform segHorizontal;
     private RectTransform segVerticalEnd;
+    private RectTransform pulseDot;
+
     private Image imgVStart;
     private Image imgH;
     private Image imgVEnd;
+    private Image imgPulse;
 
-    private Color currentColor = new Color(0.18f, 0.32f, 0.48f, 0.95f);
+    private Color currentColor = new Color(0.22f, 0.74f, 0.97f, 0.95f); // #38BDF8 Sky Vector Blue
+    private float pulsePhase = 0f;
 
     void Awake()
     {
@@ -37,8 +41,11 @@ public class UILineConnection : MonoBehaviour
         if (lineImage != null)
         {
             lineImage.raycastTarget = false;
+            lineImage.sprite = VectorUIKit.GetRoundedSprite(pill: true);
+            lineImage.type = Image.Type.Sliced;
         }
 
+        pulsePhase = Random.Range(0f, 1f);
         AsegurarSegmentosOrtogonales();
     }
 
@@ -46,18 +53,21 @@ public class UILineConnection : MonoBehaviour
     {
         if (segVerticalStart != null) return;
 
-        segVerticalStart = CrearSegmento("Seg_VStart");
-        segHorizontal = CrearSegmento("Seg_Horiz");
-        segVerticalEnd = CrearSegmento("Seg_VEnd");
+        segVerticalStart = CrearSegmento("Seg_VStart", false);
+        segHorizontal = CrearSegmento("Seg_Horiz", false);
+        segVerticalEnd = CrearSegmento("Seg_VEnd", false);
+        pulseDot = CrearSegmento("Seg_PulseDot", true);
+        pulseDot.sizeDelta = new Vector2(13f, 13f);
 
         imgVStart = segVerticalStart.GetComponent<Image>();
         imgH = segHorizontal.GetComponent<Image>();
         imgVEnd = segVerticalEnd.GetComponent<Image>();
+        imgPulse = pulseDot.GetComponent<Image>();
 
         ActualizarColoresSegmentos();
     }
 
-    private RectTransform CrearSegmento(string nombre)
+    private RectTransform CrearSegmento(string nombre, bool circular)
     {
         GameObject segObj = new GameObject(nombre, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         segObj.transform.SetParent(transform, false);
@@ -68,6 +78,8 @@ public class UILineConnection : MonoBehaviour
 
         Image img = segObj.GetComponent<Image>();
         img.raycastTarget = false;
+        img.sprite = circular ? VectorUIKit.GetCircleSprite() : VectorUIKit.GetRoundedSprite(pill: true);
+        img.type = circular ? Image.Type.Simple : Image.Type.Sliced;
         return rt;
     }
 
@@ -84,7 +96,7 @@ public class UILineConnection : MonoBehaviour
         isStaffConnection = isStaff;
         if (isStaff)
         {
-            SetLineColor(new Color(0.92f, 0.72f, 0.18f, 0.95f)); // Dorado/Ámbar representativo de Staff de Apoyo
+            SetLineColor(VectorUIKit.AccentGold);
         }
     }
 
@@ -93,7 +105,7 @@ public class UILineConnection : MonoBehaviour
         isMatrixConnection = isMatrix;
         if (isMatrix)
         {
-            SetLineColor(new Color(0.22f, 0.75f, 0.85f, 0.95f)); // Cian/Celeste para línea transversal de proyecto
+            SetLineColor(VectorUIKit.AccentPurple);
         }
     }
 
@@ -102,18 +114,24 @@ public class UILineConnection : MonoBehaviour
         if (imgVStart != null) imgVStart.color = currentColor;
         if (imgH != null) imgH.color = currentColor;
         if (imgVEnd != null) imgVEnd.color = currentColor;
+        if (imgPulse != null) imgPulse.color = Color.Lerp(currentColor, Color.white, 0.65f);
     }
 
     void LateUpdate()
     {
-        // Si alguno de los nodos desaparece, la línea se autodestruye
         if (startNode == null || endNode == null)
         {
             Destroy(gameObject);
             return;
         }
 
-        UpdateGeometry(startNode.position, endNode.position);
+        if (startEmp == null) startEmp = startNode.GetComponent<EmployeeNode>();
+        if (endEmp == null) endEmp = endNode.GetComponent<EmployeeNode>();
+
+        Vector2 startPos = startEmp != null ? (Vector2)startEmp.GetBottomPortWorldPosition() : (Vector2)startNode.position;
+        Vector2 endPos = endEmp != null ? (Vector2)endEmp.GetTopPortWorldPosition() : (Vector2)endNode.position;
+
+        UpdateGeometry(startPos, endPos);
     }
 
     public void UpdateGeometry(Vector2 startWorldPos, Vector2 endWorldPos)
@@ -130,17 +148,14 @@ public class UILineConnection : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Trazado directo en diagonal (utilizado durante el arrastre preliminar).
-    /// </summary>
     public void UpdateDirectGeometry(Vector2 startWorldPos, Vector2 endWorldPos)
     {
         if (myRect == null) myRect = GetComponent<RectTransform>();
 
-        // Desactivamos segmentos ortogonales si existieran
         if (segVerticalStart != null) segVerticalStart.gameObject.SetActive(false);
         if (segHorizontal != null) segHorizontal.gameObject.SetActive(false);
         if (segVerticalEnd != null) segVerticalEnd.gameObject.SetActive(false);
+        if (pulseDot != null) pulseDot.gameObject.SetActive(false);
 
         if (lineImage != null) lineImage.enabled = true;
 
@@ -162,12 +177,6 @@ public class UILineConnection : MonoBehaviour
         myRect.sizeDelta = new Vector2(distance, lineThickness);
     }
 
-    /// <summary>
-    /// Trazado ortogonal escalonado (en codo):
-    /// Línea vertical que desciende del superior, bus horizontal intermedio,
-    /// y bajada vertical hacia el subordinado.
-    /// Evita atravesar tarjetas en diagonal y otorga la estética profesional de organigrama.
-    /// </summary>
     public void UpdateOrthogonalGeometry(Vector2 startWorldPos, Vector2 endWorldPos)
     {
         AsegurarSegmentosOrtogonales();
@@ -185,22 +194,44 @@ public class UILineConnection : MonoBehaviour
         segVerticalStart.gameObject.SetActive(true);
         segHorizontal.gameObject.SetActive(true);
         segVerticalEnd.gameObject.SetActive(true);
+        pulseDot.gameObject.SetActive(true);
 
-        float yMid = Mathf.Lerp(localStart.y, localEnd.y, 0.5f);
+        float offsetMid = isMatrixConnection ? 0.62f : (isStaffConnection ? 0.38f : 0.50f);
+        float yMid = Mathf.Lerp(localStart.y, localEnd.y, offsetMid);
 
-        // Segmento 1: vertical desde el superior hasta el codo medio
+        // Segmento 1: bajada desde el puerto inferior del superior
         float v1Length = Mathf.Abs(localStart.y - yMid);
         segVerticalStart.localPosition = new Vector2(localStart.x, (localStart.y + yMid) * 0.5f);
-        segVerticalStart.sizeDelta = new Vector2(lineThickness, Mathf.Max(2f, v1Length));
+        segVerticalStart.sizeDelta = new Vector2(lineThickness, Mathf.Max(lineThickness, v1Length + lineThickness));
 
-        // Segmento 2: horizontal entre las columnas de ambos nodos
+        // Segmento 2: tramo horizontal intermedio
         float hLength = Mathf.Abs(localEnd.x - localStart.x);
         segHorizontal.localPosition = new Vector2((localStart.x + localEnd.x) * 0.5f, yMid);
-        segHorizontal.sizeDelta = new Vector2(Mathf.Max(2f, hLength + lineThickness), lineThickness);
+        segHorizontal.sizeDelta = new Vector2(Mathf.Max(lineThickness, hLength + lineThickness), lineThickness);
 
-        // Segmento 3: vertical desde el codo medio hasta el subordinado
+        // Segmento 3: llegada al puerto superior del subordinado
         float v2Length = Mathf.Abs(yMid - localEnd.y);
         segVerticalEnd.localPosition = new Vector2(localEnd.x, (yMid + localEnd.y) * 0.5f);
-        segVerticalEnd.sizeDelta = new Vector2(lineThickness, Mathf.Max(2f, v2Length));
+        segVerticalEnd.sizeDelta = new Vector2(lineThickness, Mathf.Max(lineThickness, v2Length + lineThickness));
+
+        // Animación continua del pulso de flujo de datos a lo largo de los 3 tramos
+        pulsePhase = (pulsePhase + Time.deltaTime * 0.65f) % 1f;
+        Vector2 p0 = new Vector2(localEnd.x, localEnd.y);
+        Vector2 p1 = new Vector2(localEnd.x, yMid);
+        Vector2 p2 = new Vector2(localStart.x, yMid);
+        Vector2 p3 = new Vector2(localStart.x, localStart.y);
+
+        if (pulsePhase < 0.33f)
+        {
+            pulseDot.localPosition = Vector2.Lerp(p0, p1, pulsePhase / 0.33f);
+        }
+        else if (pulsePhase < 0.66f)
+        {
+            pulseDot.localPosition = Vector2.Lerp(p1, p2, (pulsePhase - 0.33f) / 0.33f);
+        }
+        else
+        {
+            pulseDot.localPosition = Vector2.Lerp(p2, p3, (pulsePhase - 0.66f) / 0.34f);
+        }
     }
 }
